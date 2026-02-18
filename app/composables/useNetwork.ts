@@ -13,7 +13,7 @@ export function useNetworkStatus(options?: {
   timeoutMs?: number
   verify?: boolean
 }) {
-  const pingUrl = options?.pingUrl ?? '/api/ping'
+  const pingUrl = options?.pingUrl ?? '/api/ping-moleculer'
   const intervalMs = options?.intervalMs ?? 15_000
   const timeoutMs = options?.timeoutMs ?? 4_000
   const verify = options?.verify ?? true

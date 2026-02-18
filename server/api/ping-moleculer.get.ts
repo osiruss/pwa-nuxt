@@ -6,11 +6,11 @@ export default defineEventHandler(async (event) => {
 
     if (!res.ok) {
       setResponseStatus(event, 502)
-      return { ok: false, message: `Moleculer ping HTTP ${res.status}` }
+      return { ok: false, message: `Ping Moleculer HTTP ${res.status}` }
     }
+    const data = await res.json().catch(() => null)
 
-    const text = await res.text().catch(() => '')
-    return { ok: true, upstream: 'moleculer', raw: text || null, ts: Date.now() }
+    return { ok: true, upstream: url, data, ts: Date.now() }
   } catch (e: any) {
     setResponseStatus(event, 502)
     return { ok: false, message: e?.message ?? String(e) }
