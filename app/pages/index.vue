@@ -21,6 +21,10 @@
         <button @click="startRecording" :disabled="!cameraOn || recording">⏺️ Grabar</button>
         <button @click="stopRecording" :disabled="!recording">⏹️ Detener</button>
 
+        <button @click="openFilePicker" :disabled="syncing">📎 Adjuntar video</button>
+        <input ref="fileInputEl" type="file" accept="video/*" capture="environment" style="display:none"
+          @change="onFileSelected" />
+
 
         <button @click="syncPending" :disabled="syncing || !online">🔄 Enviar confirmados</button>
       </div>
@@ -29,6 +33,24 @@
         Pendientes: <b>{{ pendingCount }}</b>
         — Confirmados vencidos (auto): <b>{{ readyExpiredCount }}</b>
       </p>
+
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label style="display:flex; flex-direction:column; gap:6px; min-width: 280px;">
+          Cámara
+          <select v-model="selectedDeviceId" :disabled="!videoInputs.length || recording"
+            style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 10px;">
+            <option value="">(Automática)</option>
+            <option v-for="d in videoInputs" :key="d.deviceId" :value="d.deviceId">
+              {{ d.label || `Cámara ${d.deviceId.slice(0, 6)}…` }}
+            </option>
+          </select>
+        </label>
+
+        <button @click="reloadCameras" :disabled="recording">
+          🔎 Recargar cámaras
+        </button>
+      </div>
+
 
       <video ref="videoEl" autoplay playsinline muted
         style="width: 100%; max-height: 420px; background:#000; border-radius: 12px;"></video>
@@ -59,6 +81,15 @@
               <div v-if="item.status === 'ready' && item.confirmedAt" style="font-size:12px; opacity:.75;">
                 Confirmado: {{ formatDate(item.confirmedAt) }} · Auto-envío en: {{ remainingText(item) }}
               </div>
+
+              <div style="font-size:12px; opacity:.75;">
+                {{ item.mimeType }} · chunks: {{ item.chunks?.length ?? 0 }}
+              </div>
+
+              <div style="font-size:12px; opacity:.75;">
+                ⏱ {{ formatDuration(mediaMeta[item.id]?.durationSec ?? null) }}
+                · 💾 {{ formatBytes(mediaMeta[item.id]?.sizeBytes ?? 0) }}
+              </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
@@ -66,7 +97,7 @@
 
               <button @click="previewPending(item)">▶️ Ver</button>
 
-    
+
               <button v-if="item.status === 'review'" @click="confirmPending(item)" :disabled="syncing">
                 ✅ Confirmar
               </button>
@@ -92,355 +123,27 @@
   </main>
 </template>
 
-<!-- <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
-
-const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
-const AUTO_CHECK_EVERY_MS = 30 * 1000
-
-const rut = ref('')
-const msg = ref('')
-
-const videoEl = ref<HTMLVideoElement | null>(null)
-let stream: MediaStream | null = null
-const cameraOn = ref(false)
-
-let recorder: MediaRecorder | null = null
-const recording = ref(false)
-const chunks = ref<Blob[]>([])
-const lastPreviewUrl = ref<string>('')
-
-const syncing = ref(false)
-const pending = ref<StoredCase[]>([])
-const pendingCount = computed(() => pending.value.length)
-const sortedPending = computed(() => [...pending.value].sort((a, b) => b.createdAt - a.createdAt))
-
-const { status } = useNetworkStatus({
-  pingUrl: '/api/ping-moleculer',
-  verify: true,
-  intervalMs: 10_000,
-  timeoutMs: 4_000
-})
-const online = computed(() => status.value.online)
-
-let autoTimer: any = null
-
-function uuid(): string {
-  return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function setMsg(t: string) {
-  msg.value = t
-  console.log(t)
-}
-
-function formatDate(ts: number) {
-  try {
-    return new Date(ts).toLocaleString('es-CL')
-  } catch {
-    return String(ts)
-  }
-}
-
-function toPlainCase(item: any, patch?: Partial<any>) {
-  return {
-    id: item.id,
-    rut: item.rut,
-    createdAt: item.createdAt,
-    mimeType: item.mimeType,
-    chunks: Array.from(item.chunks ?? []), // ✅ importante
-    status: item.status,
-    confirmedAt: item.confirmedAt ?? null,
-    ...(patch || {})
-  }
-}
-
-function badgeStyle(s: any) {
-  const base =
-    'padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; text-transform:uppercase;'
-  if (s === 'review') return base + ' background:#e3f2fd; color:#0d47a1; border:1px solid #bbdefb;'
-  if (s === 'ready') return base + ' background:#fff3cd; color:#856404; border:1px solid #ffe8a1;'
-  if (s === 'error') return base + ' background:#ffe5e5; color:#b00020; border:1px solid #ffb3b3;'
-  return base + ' background:#f5f5f5; color:#333; border:1px solid #ddd;'
-}
-
-function isReadyExpired(item: any) {
-  if (item.status !== 'ready') return false
-  const t = item.confirmedAt ?? 0
-  if (!t) return false
-  return Date.now() - t >= AUTO_SEND_AFTER_MS
-}
-
-const readyExpiredCount = computed(() => pending.value.filter(isReadyExpired).length)
-
-function remainingText(item: any) {
-  if (item.status !== 'ready' || !item.confirmedAt) return '-'
-  const remaining = AUTO_SEND_AFTER_MS - (Date.now() - item.confirmedAt)
-  if (remaining <= 0) return 'vencido (se enviará cuando esté online)'
-  const mins = Math.floor(remaining / 60000)
-  const secs = Math.floor((remaining % 60000) / 1000)
-  return `${mins}m ${secs}s`
-}
-
-
-async function refreshPending() {
-  const all = await idbGetAll()
-  pending.value = all.filter((x: any) => x.status === 'review' || x.status === 'ready' || x.status === 'error')
-}
-
-
-async function startCamera() {
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setMsg('Este navegador no soporta getUserMedia.')
-      return
-    }
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
-      audio: true
-    })
-    if (videoEl.value) videoEl.value.srcObject = stream
-    cameraOn.value = true
-    setMsg('Cámara y micrófono activos.')
-  } catch (e: any) {
-    setMsg(`Error al abrir cámara: ${e?.message ?? e}`)
-  }
-}
-
-function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop())
-    stream = null
-  }
-  if (videoEl.value) videoEl.value.srcObject = null
-  cameraOn.value = false
-  setMsg('Cámara detenida.')
-}
-
-function pickMimeType(): string {
-  const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-  for (const c of candidates) {
-    if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c
-  }
-  return 'video/webm'
-}
-
-async function startRecording() {
-  if (!stream) return
-  if (!rut.value) {
-    setMsg('Debes ingresar el RUT antes de grabar.')
-    return
-  }
-
-  chunks.value = []
-  const mimeType = pickMimeType()
-
-  try {
-    recorder = new MediaRecorder(stream, { mimeType })
-  } catch {
-    recorder = new MediaRecorder(stream)
-  }
-
-  recorder.ondataavailable = (ev: BlobEvent) => {
-    if (ev.data && ev.data.size > 0) chunks.value.push(ev.data)
-  }
-
-  recorder.onstop = async () => {
-    recording.value = false
-
-    const blob = new Blob(chunks.value, { type: recorder?.mimeType || 'video/webm' })
-    if (lastPreviewUrl.value) URL.revokeObjectURL(lastPreviewUrl.value)
-    lastPreviewUrl.value = URL.createObjectURL(blob)
-
-    // ✅ Recién grabado queda en review (NO listo)
-    const item = {
-      id: uuid(),
-      rut: rut.value,
-      createdAt: Date.now(),
-      status: 'review',
-      confirmedAt: null,
-      mimeType: recorder?.mimeType || 'video/webm',
-      chunks: [...chunks.value]
-    }
-
-    await idbPut(item as any)
-    await refreshPending()
-    setMsg('Grabación guardada. Revisa y CONFIRMA para dejar listo para envío.')
-  }
-
-  recorder.start(1000)
-  recording.value = true
-  setMsg('Grabando...')
-}
-
-function stopRecording() {
-  if (recorder && recording.value) recorder.stop()
-}
-
-// =========================
-// PREVIEW / CONFIRM
-// =========================
-function previewPending(item: StoredCase) {
-  const blob = new Blob((item as any).chunks, { type: (item as any).mimeType })
-  if (lastPreviewUrl.value) URL.revokeObjectURL(lastPreviewUrl.value)
-  lastPreviewUrl.value = URL.createObjectURL(blob)
-  setMsg(`Preview cargado: ${item.id}`)
-}
-
-async function confirmPending(item: any) {
-  const updated = toPlainCase(item, {
-    status: 'ready',
-    confirmedAt: Date.now()
-  })
-
-  await idbPut(updated as any)
-  await refreshPending()
-  setMsg(`Confirmado: ${item.id}. Se enviará automático en 1 minuto si no lo envías manualmente.`)
-}
-
-// =========================
-// UPLOAD / SYNC
-// =========================
-async function uploadCase(item: any) {
-  const blob = new Blob(item.chunks, { type: item.mimeType })
-
-  const fd = new FormData()
-  fd.append('rut', item.rut)
-  fd.append('createdAt', String(item.createdAt))
-  fd.append('video', blob, `${item.rut}-${item.createdAt}.webm`)
-
-  const res = await fetch('/api/upload', { method: 'POST', body: fd })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    throw new Error(`Upload falló: ${res.status} ${txt}`)
-  }
-}
-
-async function syncOne(item: any) {
-  if (!online.value) {
-    setMsg('OFFLINE (ping). No se puede subir.')
-    return
-  }
-  if (item.status !== 'ready') {
-    setMsg('Debes CONFIRMAR el video antes de subir.')
-    return
-  }
-  if (syncing.value) return
-
-  syncing.value = true
-  try {
-    setMsg(`Subiendo caso ${item.id} (RUT ${item.rut})...`)
-    await uploadCase(item)
-    await idbDelete(item.id)
-    await refreshPending()
-    setMsg(`Subido OK y eliminado local: ${item.id}`)
-  } catch (e: any) {
-    await idbPut(toPlainCase(item, { status: 'error' }) as any)
-    await refreshPending()
-    setMsg(`Error subiendo ${item.id}: ${e?.message ?? e}`)
-  } finally {
-    syncing.value = false
-  }
-}
-
-async function syncPending() {
-  if (!online.value) {
-    setMsg('OFFLINE (ping). No se puede sincronizar.')
-    return
-  }
-  if (syncing.value) return
-
-  syncing.value = true
-  try {
-    await refreshPending()
-    const ready = pending.value.filter((x: any) => x.status === 'ready')
-    if (ready.length === 0) {
-      setMsg('No hay confirmados listos para enviar.')
-      return
-    }
-
-    const items = [...ready]
-    for (const item of items) {
-      try {
-        setMsg(`Subiendo confirmado ${item.id}...`)
-        await uploadCase(item)
-        await idbDelete(item.id)
-      } catch (e: any) {
-        await idbPut(toPlainCase(item, { status: 'error' }) as any)
-        setMsg(`Error subiendo ${item.id}: ${e?.message ?? e}`)
-      }
-    }
-
-    await refreshPending()
-    setMsg('Envío manual terminado.')
-  } finally {
-    syncing.value = false
-  }
-}
-
-async function syncReadyExpired() {
-  if (!online.value) return
-  if (syncing.value) return
-
-  await refreshPending()
-  const expired = pending.value.filter((x: any) => isReadyExpired(x))
-  if (expired.length === 0) return
-
-  syncing.value = true
-  try {
-    const items = [...expired]
-    for (const item of items) {
-      try {
-        setMsg(`(Auto) Subiendo confirmado ${item.id}...`)
-        await uploadCase(item)
-        await idbDelete(item.id)
-      } catch (e: any) {
-        await idbPut(toPlainCase(item, { status: 'error' }) as any)
-        setMsg(`(Auto) Error subiendo ${item.id}: ${e?.message ?? e}`)
-      }
-    }
-    await refreshPending()
-    setMsg('(Auto) Envío automático terminado.')
-  } finally {
-    syncing.value = false
-  }
-}
-
-async function removePending(id: string) {
-  await idbDelete(id)
-  await refreshPending()
-  setMsg(`Pendiente eliminado: ${id}`)
-}
-
-// ✅ Cuando vuelve ONLINE por ping, intenta auto-enviar vencidos
-watch(
-  () => online.value,
-  async (isOnline, wasOnline) => {
-    if (!wasOnline && isOnline) {
-      setMsg('Volviste ONLINE (ping). Revisando confirmados vencidos...')
-      await syncReadyExpired()
-    }
-  }
-)
-
-onMounted(async () => {
-  await refreshPending()
-  await ping()
-  autoTimer = setInterval(() => {
-    syncReadyExpired()
-  }, AUTO_CHECK_EVERY_MS)
-})
-
-onBeforeUnmount(() => {
-  stopCamera()
-  if (lastPreviewUrl.value) URL.revokeObjectURL(lastPreviewUrl.value)
-  if (autoTimer) clearInterval(autoTimer)
-})
-</script> -->
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
+type MediaMeta = {
+  sizeBytes: number;
+  durationSec: number | null
+}
+
+const mediaMeta = ref<Record<string, MediaMeta>>({})
+import {
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  watch
+} from 'vue'
+
+import {
+  idbPut,
+  idbGetAll,
+  idbDelete,
+  type StoredCase
+} from '~/utils/idb'
 
 const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
 const AUTO_CHECK_EVERY_MS = 30 * 1000
@@ -473,6 +176,158 @@ const online = computed(() => status.value.online)
 let autoTimer: any = null
 
 const autoTimeouts = new Map<string, any>()
+
+const videoInputs = ref<MediaDeviceInfo[]>([])
+const selectedDeviceId = ref<string>('') 
+const permissionPrimed = ref(false)
+
+const fileInputEl = ref<HTMLInputElement | null>(null)
+
+function formatBytes(bytes: number) {
+  const kb = 1024
+  const mb = kb * 1024
+  const gb = mb * 1024
+  if (bytes >= gb) return `${(bytes / gb).toFixed(2)} GB`
+  if (bytes >= mb) return `${(bytes / mb).toFixed(2)} MB`
+  if (bytes >= kb) return `${(bytes / kb).toFixed(1)} KB`
+  return `${bytes} B`
+}
+
+function openFilePicker() {
+  if (!rut.value) {
+    setMsg('Debes ingresar el RUT antes de adjuntar un video.')
+    return
+  }
+  fileInputEl.value?.click()
+}
+
+async function fileToChunks(file: File, chunkSize = 1024 * 1024) {
+  const out: Blob[] = []
+  let offset = 0
+  while (offset < file.size) {
+    out.push(file.slice(offset, offset + chunkSize, file.type))
+    offset += chunkSize
+  }
+  return out
+}
+
+async function onFileSelected(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+
+  if (!file) return
+  if (!rut.value) {
+    setMsg('Debes ingresar el RUT antes de adjuntar un video.')
+    return
+  }
+
+  try {
+    setMsg(`Adjuntando video: ${file.name} (${formatBytes(file.size)})...`)
+
+    const mimeType = file.type || 'video/mp4'
+    const chunksArr = await fileToChunks(file)
+
+    const item: any = {
+      id: uuid(),
+      rut: rut.value,
+      createdAt: Date.now(),
+      status: 'review',
+      confirmedAt: null,
+      mimeType,
+      chunks: chunksArr
+    }
+
+    await idbPut(item as any)
+    await refreshPending()
+
+
+    computeMetaForItem(item)
+      .then((meta) => {
+        mediaMeta.value = { ...mediaMeta.value, [item.id]: meta }
+      })
+      .catch(() => {
+        mediaMeta.value = { ...mediaMeta.value, [item.id]: { sizeBytes: file.size, durationSec: null } }
+      })
+
+    setMsg('Video adjuntado y guardado OFFLINE. Revisa y CONFIRMA para dejar listo para envío.')
+  } catch (e: any) {
+    setMsg(`Error adjuntando video: ${e?.message ?? e}`)
+  }
+}
+
+function formatDuration(sec: number | null) {
+  if (sec == null || !Number.isFinite(sec)) return '-'
+  const s = Math.floor(sec)
+  const mm = Math.floor(s / 60)
+  const ss = s % 60
+  return `${mm}:${String(ss).padStart(2, '0')}`
+}
+
+
+async function primePermissions() {
+
+  if (permissionPrimed.value) return
+  try {
+    const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    tmp.getTracks().forEach(t => t.stop())
+    permissionPrimed.value = true
+  } catch {
+
+  }
+}
+
+async function loadVideoDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    videoInputs.value = []
+    return
+  }
+  const all = await navigator.mediaDevices.enumerateDevices()
+  videoInputs.value = all.filter(d => d.kind === 'videoinput')
+}
+
+async function reloadCameras() {
+  await primePermissions()
+  await loadVideoDevices()
+  if (videoInputs.value.length === 0) {
+    setMsg('No se encontraron cámaras (videoinput).')
+  } else {
+    setMsg(`Cámaras detectadas: ${videoInputs.value.length}`)
+  }
+}
+
+
+async function computeMetaForItem(item: any): Promise<MediaMeta> {
+  const blob = new Blob(Array.from(item.chunks ?? []), { type: item.mimeType || 'video/webm' })
+  const sizeBytes = blob.size
+
+  const durationSec = await new Promise<number | null>((resolve) => {
+    const url = URL.createObjectURL(blob)
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.muted = true
+
+    const cleanup = () => {
+      try { URL.revokeObjectURL(url) } catch { }
+    }
+
+    v.onloadedmetadata = () => {
+      const d = Number.isFinite(v.duration) ? v.duration : null
+      cleanup()
+      resolve(d)
+    }
+    v.onerror = () => {
+      cleanup()
+      resolve(null)
+    }
+
+    v.src = url
+  })
+
+  return { sizeBytes, durationSec }
+}
+
+
 
 function uuid(): string {
   return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -534,7 +389,26 @@ function remainingText(item: any) {
 async function refreshPending() {
   const all = await idbGetAll()
   pending.value = all.filter((x: any) => x.status === 'review' || x.status === 'ready' || x.status === 'error')
+
+
+  for (const item of pending.value as any[]) {
+    if (mediaMeta.value[item.id]) continue
+    computeMetaForItem(item)
+      .then((meta) => {
+        mediaMeta.value = {
+          ...mediaMeta.value,
+          [item.id]: meta
+        }
+      })
+      .catch(() => {
+        mediaMeta.value = {
+          ...mediaMeta.value,
+          [item.id]: { sizeBytes: 0, durationSec: null }
+        }
+      })
+  }
 }
+
 
 
 function scheduleAutoSend(item: any) {
@@ -556,21 +430,44 @@ function scheduleAutoSend(item: any) {
 
 async function startCamera() {
   try {
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setMsg('Este navegador no soporta getUserMedia.')
       return
     }
+
+
+    if (stream) stopCamera()
+
+    await primePermissions()
+    await loadVideoDevices()
+
+    const wantDeviceId = selectedDeviceId.value?.trim()
+
+    const videoConstraints: MediaTrackConstraints = wantDeviceId
+      ? { deviceId: { exact: wantDeviceId } }
+      : { facingMode: 'user' }
+
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
+      video: videoConstraints,
       audio: true
     })
+
     if (videoEl.value) videoEl.value.srcObject = stream
     cameraOn.value = true
+
+    const track = stream.getVideoTracks()[0]
+    const settings = track?.getSettings?.()
+    if (!wantDeviceId && settings?.deviceId) {
+      selectedDeviceId.value = String(settings.deviceId)
+    }
+
     setMsg('Cámara y micrófono activos.')
   } catch (e: any) {
     setMsg(`Error al abrir cámara: ${e?.message ?? e}`)
   }
 }
+
 
 function stopCamera() {
   if (stream) {
@@ -583,7 +480,11 @@ function stopCamera() {
 }
 
 function pickMimeType(): string {
-  const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+  const candidates = [
+    'video/webm;codecs=vp9,opus', 
+    'video/webm;codecs=vp8,opus', 
+    'video/webm'
+  ]
   for (const c of candidates) {
     if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c
   }
@@ -667,7 +568,13 @@ async function uploadCase(item: any) {
   const fd = new FormData()
   fd.append('rut', item.rut)
   fd.append('createdAt', String(item.createdAt))
-  fd.append('video', blob, `${item.rut}-${item.createdAt}.webm`)
+  // fd.append('video', blob, `${item.rut}-${item.createdAt}.webm`)
+  const ext = (item.mimeType?.includes('mp4')) ? 'mp4'
+  : (item.mimeType?.includes('quicktime')) ? 'mov'
+  : (item.mimeType?.includes('webm')) ? 'webm'
+  : 'bin'
+
+fd.append('video', blob, `${item.rut}-${item.createdAt}.${ext}`)
 
   const res = await fetch('/api/upload', { method: 'POST', body: fd })
   if (!res.ok) {
@@ -785,6 +692,10 @@ watch(
 onMounted(async () => {
   await refreshPending()
   await ping()
+  await loadVideoDevices()
+
+  await primePermissions()
+  await loadVideoDevices()
 
   for (const item of pending.value as any[]) {
     scheduleAutoSend(item)
@@ -806,6 +717,22 @@ onBeforeUnmount(() => {
   for (const t of autoTimeouts.values()) clearTimeout(t)
   autoTimeouts.clear()
 })
+
+watch(
+  () => selectedDeviceId.value,
+  async (newId, oldId) => {
+    if (newId === oldId) return
+    if (!cameraOn.value) return
+    if (recording.value) {
+      setMsg('No puedes cambiar cámara mientras grabas.')
+      selectedDeviceId.value = oldId || ''
+      return
+    }
+    await startCamera()
+  }
+)
+
+
 </script>
 
 

@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const url = 'http://localhost:3001/tracking/sitpriv/ping'
+  const url = 'https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/ping'
 
   try {
     const res = await fetch(url, { method: 'GET' })

@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const target = 'http://localhost:3001/tracking/sitpriv/upload'
+  const target = 'https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/upload'
 
   const ct = getHeader(event, 'content-type') || ''
   if (!ct.includes('multipart/form-data')) {

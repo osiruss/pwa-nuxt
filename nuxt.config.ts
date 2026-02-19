@@ -16,9 +16,14 @@ export default defineNuxtConfig({
     },
     workbox: {
       navigateFallback: '/',
-      runtimeCaching: [
-        // acá puedes cachear assets o endpoints si quieres
-      ]
+      runtimeCaching: []
     }
-  }
+  },
+  vite: {
+    server: {
+      allowedHosts: ['uncriticisably-vitiable-yvone.ngrok-free.dev'],
+      host: true,
+      port: 3000
+    }
+  },
 })
