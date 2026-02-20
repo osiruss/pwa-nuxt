@@ -4,7 +4,7 @@
       <div ref="topAnchorEl" class="top-anchor"></div>
 
       <!-- Floating camera -->
-      <div
+      <!-- <div
         v-show="termsAccepted && cameraOn"
         ref="videoFloatEl"
         class="video-float draggable-resizable"
@@ -18,8 +18,35 @@
         <video ref="videoEl" autoplay playsinline muted class="video-float__video"></video>
 
         <div class="video-float__resize" @pointerdown="onResizePointerDown" aria-label="Resize"></div>
-      </div>
+      </div> -->
+<div
+  v-show="termsAccepted && cameraOn"
+  ref="videoFloatEl"
+  class="video-float draggable-resizable"
+  :style="videoFloatStyle"
+>
+  <video
+    ref="videoEl"
+    autoplay
+    playsinline
+    muted
+    class="video-float__video"
+  ></video>
 
+  <!-- Drag handle (icono) -->
+  <div
+    class="video-float__drag"
+    @pointerdown="onDragPointerDown"
+    title="Mover"
+  ></div>
+
+  <!-- Resize handle (icono) -->
+  <div
+    class="video-float__resize"
+    @pointerdown="onResizePointerDown"
+    title="Redimensionar"
+  ></div>
+</div>
       <!-- Status -->
       <p class="status">
         Estado conexión: <b>{{ online ? 'ONLINE' : 'OFFLINE' }}</b>
@@ -217,18 +244,18 @@ const { status, ping } = useNetworkStatus({
   intervalMs: 10_000,
   timeoutMs: 4_000
 })
+
 const online = computed(() => status.value.online)
 
-/** Floating UI refs + state */
 const topAnchorEl = ref<HTMLElement | null>(null)
 const previewAnchorEl = ref<HTMLElement | null>(null)
 const videoFloatEl = ref<HTMLElement | null>(null)
 
 const floatX = ref(14)
 const floatY = ref(14)
-const floatW = ref(220)
+const floatW = ref(100)
 
-const MIN_W = 220
+const MIN_W = 100
 const MAX_W = 520
 
 let dragging = false
@@ -363,7 +390,7 @@ function keepInsideViewport(nextX: number, nextY: number, w: number) {
 
 function getInitialFloatWidth() {
   const vw = window.innerWidth
-  const base = 220
+  const base = 100
   if (vw < 480) return Math.max(base, vw * 0.6)
   if (vw < 900) return Math.max(base, vw * 0.4)
   return Math.max(base, Math.min(360, vw * 0.25))
@@ -1115,7 +1142,7 @@ button:disabled {
   display: block;
 }
 
-.video-float__dragbar {
+/* .video-float__dragbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1129,7 +1156,7 @@ button:disabled {
 
 .video-float__dragbar:active {
   cursor: grabbing;
-}
+} */
 
 .video-float__dragdot {
   opacity: 0.85;
@@ -1213,5 +1240,73 @@ button:disabled {
   color: white;
   font-size: 18px;
   cursor: pointer;
+}
+
+
+.draggable-resizable{
+  position: fixed;
+  z-index: 9999;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 14px 40px rgba(0,0,0,.28);
+  touch-action: none; /* CLAVE para drag en móvil */
+}
+
+.video-float__video{
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Drag icon */
+.video-float__drag{
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.28);
+  cursor: grab;
+  z-index: 2;          /* CLAVE: que quede sobre el video */
+  pointer-events: auto;
+}
+
+.video-float__drag:active{ cursor: grabbing; }
+
+.video-float__drag::before{
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.75) 2px, transparent 3px) 0 0 / 8px 8px;
+  opacity: .95;
+}
+
+/* Resize icon */
+.video-float__resize{
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.28);
+  cursor: nwse-resize;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.video-float__resize::before{
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-right: 2px solid rgba(255,255,255,.65);
+  border-bottom: 2px solid rgba(255,255,255,.65);
+  border-radius: 4px;
 }
 </style>
