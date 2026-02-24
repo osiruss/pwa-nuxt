@@ -2,58 +2,18 @@
   <main class="page">
     <section class="card">
       <div ref="topAnchorEl" class="top-anchor"></div>
-
-      <!-- Floating camera -->
-      <!-- <div
-        v-show="termsAccepted && cameraOn"
-        ref="videoFloatEl"
-        class="video-float draggable-resizable"
-        :style="videoFloatStyle"
-      >
-        <div class="video-float__dragbar" @pointerdown="onDragPointerDown">
-          <span class="video-float__dragdot">⋮⋮</span>
-          <span class="video-float__dragtext">Cámara</span>
-        </div>
-
+      <div v-show="termsAccepted && cameraOn" ref="videoFloatEl" class="video-float draggable-resizable"
+        :style="videoFloatStyle">
         <video ref="videoEl" autoplay playsinline muted class="video-float__video"></video>
 
-        <div class="video-float__resize" @pointerdown="onResizePointerDown" aria-label="Resize"></div>
-      </div> -->
-<div
-  v-show="termsAccepted && cameraOn"
-  ref="videoFloatEl"
-  class="video-float draggable-resizable"
-  :style="videoFloatStyle"
->
-  <video
-    ref="videoEl"
-    autoplay
-    playsinline
-    muted
-    class="video-float__video"
-  ></video>
+        <div class="video-float__drag" @pointerdown="onDragPointerDown" title="Mover"></div>
 
-  <!-- Drag handle (icono) -->
-  <div
-    class="video-float__drag"
-    @pointerdown="onDragPointerDown"
-    title="Mover"
-  ></div>
-
-  <!-- Resize handle (icono) -->
-  <div
-    class="video-float__resize"
-    @pointerdown="onResizePointerDown"
-    title="Redimensionar"
-  ></div>
-</div>
-      <!-- Status -->
+        <div class="video-float__resize" @pointerdown="onResizePointerDown" title="Redimensionar"></div>
+      </div>
       <p class="status">
         Estado conexión: <b>{{ online ? 'ONLINE' : 'OFFLINE' }}</b>
         <small v-if="status.mode === 'verified'"> (verificado)</small>
       </p>
-
-      <!-- Step: RUT -->
       <div v-if="uiStep === 'rut'" class="stack">
         <label class="field">
           <span class="label">RUT pensionado</span>
@@ -76,22 +36,12 @@
 
         <!-- Terms -->
         <div class="terms">
-          <h2 class="terms__title">What is Lorem Ipsum?</h2>
-          <p class="terms__p">
-            Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the
-            industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and
-            scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into
-            electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of
-            Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like
-            Aldus PageMaker including versions of Lorem Ipsum.
-          </p>
-          <p class="terms__p">
-            Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the
-            industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and
-            scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into
-            electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of
-            Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like
-            Aldus PageMaker including versions of Lorem Ipsum.
+          <h2 class="terms__title">
+            {{ guion?.titulo || (pending ? 'Cargando…' : 'Sin contenido') }}
+          </h2>
+
+          <p v-for="(p, i) in paragraphs" :key="i" class="terms__p">
+            {{ p }}
           </p>
 
           <label class="checkbox">
@@ -99,7 +49,13 @@
             <span>He leído las condiciones.</span>
           </label>
 
-          <button class="btn btn-ghost2" @click="back" :disabled="syncing || !online">← Volver</button>
+          <button class="btn btn-ghost2" @click="back" :disabled="syncing || !online">
+            ← Volver
+          </button>
+
+          <p v-if="error" class="terms__p" style="opacity:.7">
+            Error cargando contenido.
+          </p>
         </div>
 
         <!-- Main actions -->
@@ -119,14 +75,8 @@
             <button class="btn" @click="stopCamera" :disabled="!cameraOn">⛔ Apagar cámara</button>
 
             <button class="btn" @click="openFilePicker" :disabled="syncing">📎 Adjuntar video</button>
-            <input
-              ref="fileInputEl"
-              type="file"
-              accept="video/*"
-              capture="environment"
-              class="hidden"
-              @change="onFileSelected"
-            />
+            <input ref="fileInputEl" type="file" accept="video/*" capture="environment" class="hidden"
+              @change="onFileSelected" />
 
             <button class="btn" @click="syncPending" :disabled="syncing || !online">🔄 Enviar confirmados</button>
           </div>
@@ -165,8 +115,12 @@
 
                 <div class="pending__actions">
                   <span :style="badgeStyle(item.status)">{{ item.status }}</span>
+                  <button class="btn" @click="editPendingVideo(item)" :disabled="syncing">
+                    ✏️ Editar video
+                  </button>
 
                   <button class="btn" @click="previewPending(item)">▶️ Ver</button>
+                  <button @click="downloadPending(item)">⬇️ Descargar</button>
 
                   <button v-if="item.status === 'review'" class="btn" @click="confirmPending(item)" :disabled="syncing">
                     ✅ Confirmar
@@ -209,6 +163,11 @@ import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
 type MediaMeta = { sizeBytes: number; durationSec: number | null }
 type UiStep = 'rut' | 'terms'
 
+
+const editingId = ref<string | null>(null)
+const editingOriginal = ref<any | null>(null)
+
+
 const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
 const AUTO_CHECK_EVERY_MS = 30 * 1000
 
@@ -235,6 +194,9 @@ const sortedPending = computed(() => [...pending.value].sort((a, b) => b.created
 
 const uiStep = ref<UiStep>('rut')
 const termsAccepted = ref(false)
+
+const { guion, paragraphs, error } = useTerms()
+
 
 const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
 
@@ -283,6 +245,45 @@ let autoTimer: ReturnType<typeof setInterval> | null = null
 const autoTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 /* ------------------------ UI helpers ------------------------ */
+
+function extFromMime(mime: string) {
+  const m = (mime || '').toLowerCase()
+  if (m.includes('mp4')) return 'mp4'
+  if (m.includes('quicktime') || m.includes('mov')) return 'mov'
+  if (m.includes('webm')) return 'webm'
+  return 'bin'
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+
+  // revoca luego para no cortar descarga en algunos browsers
+  setTimeout(() => {
+    try { URL.revokeObjectURL(url) } catch { }
+  }, 1500)
+}
+
+function downloadPending(item: any) {
+  try {
+    const mime = item.mimeType || 'application/octet-stream'
+    const blob = new Blob(Array.from(item.chunks ?? []), { type: mime })
+    const ext = extFromMime(mime)
+    const filename = `${item.rut || 'sin-rut'}-${item.createdAt || Date.now()}.${ext}`
+    downloadBlob(blob, filename)
+    setMsg(`Descargando: ${filename}`)
+  } catch (e: any) {
+    setMsg(`Error descargando: ${e?.message ?? e}`)
+  }
+}
+
 function setMsg(t: string) {
   msg.value = t
   console.log(t)
@@ -320,7 +321,7 @@ function resetToStartAfterDelay(ms = 3000) {
 function cleanupPreview() {
   try {
     if (lastPreviewUrl.value) URL.revokeObjectURL(lastPreviewUrl.value)
-  } catch {}
+  } catch { }
   lastPreviewUrl.value = ''
 }
 
@@ -411,7 +412,7 @@ function onDragPointerDown(ev: PointerEvent) {
   dragOriginX = floatX.value
   dragOriginY = floatY.value
 
-  ;(ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
+    ; (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
   window.addEventListener('pointermove', onPointerMove, { passive: false })
   window.addEventListener('pointerup', onPointerUp, { passive: true })
 }
@@ -423,7 +424,7 @@ function onResizePointerDown(ev: PointerEvent) {
   resizeStartX = ev.clientX
   resizeOriginW = floatW.value
 
-  ;(ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
+    ; (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
   window.addEventListener('pointermove', onPointerMove, { passive: false })
   window.addEventListener('pointerup', onPointerUp, { passive: true })
 }
@@ -473,6 +474,35 @@ function toPlainCase(item: any, patch?: Partial<any>) {
   }
 }
 
+async function replaceVideoOnItem(item: any, patch: {
+  chunks: Blob[],
+  mimeType: string,
+  keepConfirmedAt?: boolean
+}) {
+  const next = toPlainCase(item, {
+    // reemplaza el video
+    chunks: [...patch.chunks],
+    mimeType: patch.mimeType,
+
+    // actualiza timestamps
+    createdAt: Date.now(),
+
+    // al editar, lo mandamos a revisión (o si quieres directo a ready)
+    status: 'review',
+    confirmedAt: patch.keepConfirmedAt ? item.confirmedAt ?? null : null,
+  })
+
+  await idbPut(next as any)
+
+  // recalcular meta (duración/peso)
+  computeMetaForItem(next)
+    .then((meta) => (mediaMeta.value = { ...mediaMeta.value, [next.id]: meta }))
+    .catch(() => (mediaMeta.value = { ...mediaMeta.value, [next.id]: { sizeBytes: 0, durationSec: null } }))
+
+  await refreshPending()
+  return next
+}
+
 async function fileToChunks(file: File, chunkSize = 1024 * 1024) {
   const out: Blob[] = []
   let offset = 0
@@ -496,7 +526,7 @@ async function computeMetaForItem(item: any): Promise<MediaMeta> {
     const cleanup = () => {
       try {
         URL.revokeObjectURL(url)
-      } catch {}
+      } catch { }
     }
 
     v.onloadedmetadata = () => {
@@ -668,6 +698,32 @@ async function startRecording() {
     cleanupPreview()
     lastPreviewUrl.value = URL.createObjectURL(blob)
 
+    // ✅ SI ESTOY EDITANDO: reemplazo el video del item existente
+    if (editingId.value) {
+      const current = pending.value.find((x: any) => x.id === editingId.value) || editingOriginal.value
+      if (!current) {
+        editingId.value = null
+        editingOriginal.value = null
+        stopCamera()
+        return setMsg('No encontré el pendiente a editar.')
+      }
+
+      await replaceVideoOnItem(current, {
+        chunks: [...chunks.value],
+        mimeType: recorder?.mimeType || 'video/webm',
+        keepConfirmedAt: false,
+      })
+
+      editingId.value = null
+      editingOriginal.value = null
+
+      setMsg('Video actualizado. Revisa y CONFIRMA nuevamente para habilitar envío.')
+      stopCamera()
+      scrollToPreview()
+      return
+    }
+
+    // ✅ FLUJO NORMAL: crea nuevo item
     const item: any = {
       id: uuid(),
       rut: rut.value,
@@ -684,6 +740,30 @@ async function startRecording() {
     stopCamera()
     scrollToPreview()
   }
+
+  // recorder.onstop = async () => {
+  //   recording.value = false
+
+  //   const blob = new Blob(chunks.value, { type: recorder?.mimeType || 'video/webm' })
+  //   cleanupPreview()
+  //   lastPreviewUrl.value = URL.createObjectURL(blob)
+
+  //   const item: any = {
+  //     id: uuid(),
+  //     rut: rut.value,
+  //     createdAt: Date.now(),
+  //     status: 'review',
+  //     confirmedAt: null,
+  //     mimeType: recorder?.mimeType || 'video/webm',
+  //     chunks: [...chunks.value]
+  //   }
+
+  //   await idbPut(item as any)
+  //   await refreshPending()
+  //   setMsg('Grabación guardada. Revisa y CONFIRMA para dejar listo para envío.')
+  //   stopCamera()
+  //   scrollToPreview()
+  // }
 
   recorder.start(1000)
   recording.value = true
@@ -712,6 +792,27 @@ async function onFileSelected(ev: Event) {
 
     const mimeType = file.type || 'video/mp4'
     const chunksArr = await fileToChunks(file)
+
+    if (editingId.value) {
+      const current = pending.value.find((x: any) => x.id === editingId.value) || editingOriginal.value
+      if (!current) {
+        editingId.value = null
+        editingOriginal.value = null
+        return setMsg('No encontré el pendiente a editar.')
+      }
+
+      await replaceVideoOnItem(current, {
+        chunks: chunksArr,
+        mimeType,
+        keepConfirmedAt: false,
+      })
+
+      editingId.value = null
+      editingOriginal.value = null
+
+      setMsg('Video adjuntado y actualizado. Revisa y CONFIRMA nuevamente.')
+      return
+    }
 
     const item: any = {
       id: uuid(),
@@ -742,6 +843,30 @@ function previewPending(item: StoredCase) {
   cleanupPreview()
   lastPreviewUrl.value = URL.createObjectURL(blob)
   setMsg(`Preview cargado: ${item.id}`)
+}
+
+async function editPendingVideo(item: any) {
+  if (recording.value) return setMsg('Estás grabando. Detén la grabación primero.')
+  if (syncing.value) return setMsg('Sincronizando. Espera un momento.')
+  if (!termsAccepted.value) return setMsg('Debes aceptar los términos para editar.')
+  if (!item?.id) return
+
+  // si estaba ready, evitamos que se envíe por auto-send mientras editas
+  if (item.status === 'ready') {
+    const updated = toPlainCase(item, { status: 'review', confirmedAt: null })
+    await idbPut(updated as any)
+    await refreshPending()
+  }
+
+  editingId.value = item.id
+  editingOriginal.value = toPlainCase(item)
+
+  // opcional: previsualiza lo que estás editando
+  previewPending(item)
+
+  // enciende cámara para regrabar
+  await startCamera()
+  setMsg(`Editando video del caso: ${item.id}`)
 }
 
 async function confirmPending(item: any) {
@@ -1243,70 +1368,73 @@ button:disabled {
 }
 
 
-.draggable-resizable{
+.draggable-resizable {
   position: fixed;
   z-index: 9999;
   border-radius: 14px;
   overflow: hidden;
   background: #000;
-  border: 1px solid rgba(255,255,255,.18);
-  box-shadow: 0 14px 40px rgba(0,0,0,.28);
-  touch-action: none; /* CLAVE para drag en móvil */
+  border: 1px solid rgba(255, 255, 255, .18);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .28);
+  touch-action: none;
+  /* CLAVE para drag en móvil */
 }
 
-.video-float__video{
+.video-float__video {
   width: 100%;
   height: auto;
   display: block;
 }
 
 /* Drag icon */
-.video-float__drag{
+.video-float__drag {
   position: absolute;
   left: 6px;
   bottom: 6px;
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .28);
   cursor: grab;
-  z-index: 2;          /* CLAVE: que quede sobre el video */
+  z-index: 2;
+  /* CLAVE: que quede sobre el video */
   pointer-events: auto;
 }
 
-.video-float__drag:active{ cursor: grabbing; }
+.video-float__drag:active {
+  cursor: grabbing;
+}
 
-.video-float__drag::before{
+.video-float__drag::before {
   content: "";
   position: absolute;
   inset: 6px;
   background:
-    radial-gradient(circle, rgba(255,255,255,.75) 2px, transparent 3px) 0 0 / 8px 8px;
+    radial-gradient(circle, rgba(255, 255, 255, .75) 2px, transparent 3px) 0 0 / 8px 8px;
   opacity: .95;
 }
 
-/* Resize icon */
-.video-float__resize{
+.video-float__resize {
   position: absolute;
   right: 6px;
   bottom: 6px;
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .28);
   cursor: nwse-resize;
   z-index: 2;
   pointer-events: auto;
 }
 
-.video-float__resize::before{
+.video-float__resize::before {
   content: "";
   position: absolute;
   inset: 6px;
-  border-right: 2px solid rgba(255,255,255,.65);
-  border-bottom: 2px solid rgba(255,255,255,.65);
+  border-right: 2px solid rgba(255, 255, 255, .65);
+  border-bottom: 2px solid rgba(255, 255, 255, .65);
   border-radius: 4px;
 }
 </style>

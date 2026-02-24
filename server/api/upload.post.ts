@@ -1,5 +1,7 @@
 export default defineEventHandler(async (event) => {
-  const target = 'http://localhost:3001/tracking/sitpriv/upload'
+  const config = useRuntimeConfig()
+  const target = `${config.public.apiBase}/tracking/sitpriv/upload`; //'http://localhost:3001/tracking/sitpriv/upload'
+  
 
   const ct = getHeader(event, 'content-type') || ''
   if (!ct.includes('multipart/form-data')) {

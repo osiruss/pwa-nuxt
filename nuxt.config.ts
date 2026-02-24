@@ -19,6 +19,13 @@ export default defineNuxtConfig({
       runtimeCaching: []
     }
   },
+
+  runtimeConfig: {
+    public: {
+      apiBase: ''
+    }
+  },
+  
   vite: {
     server: {
       allowedHosts: ['uncriticisably-vitiable-yvone.ngrok-free.dev'],
