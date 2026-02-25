@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   modules: ['@vite-pwa/nuxt', '@nuxt/ui'],
   ssr: false,
   pwa: {
+    devOptions: { enabled: false },
     registerType: 'autoUpdate',
     manifest: {
       name: 'POC Afiliación Offline',
@@ -28,7 +29,7 @@ export default defineNuxtConfig({
   
   vite: {
     server: {
-      allowedHosts: ['uncriticisably-vitiable-yvone.ngrok-free.dev'],
+      //allowedHosts: ['uncriticisably-vitiable-yvone.ngrok-free.dev'],
       host: true,
       port: 3000
     }

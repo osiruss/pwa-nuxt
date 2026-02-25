@@ -1543,4 +1543,8 @@ button:disabled {
   display: grid;
   gap: 10px;
 }
+
+.input{
+  width: auto;
+}
 </style>
