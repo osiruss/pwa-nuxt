@@ -37,11 +37,18 @@
         <!-- Terms -->
         <div class="terms">
           <h2 class="terms__title">
-            {{ guion?.titulo || (pending ? 'Cargando…' : 'Sin contenido') }}
+            {{ guion?.titulo || (pendingx ? 'Cargando…' : 'Sin contenido') }}
           </h2>
 
           <p v-for="(p, i) in paragraphs" :key="i" class="terms__p">
             {{ p }}
+          </p>
+
+          <p v-if="source === 'cache'" style="opacity:.7">
+            Estás viendo una copia offline guardada.
+          </p>
+          <p v-else-if="error && !guion" style="opacity:.7">
+            No se pudo cargar el contenido.
           </p>
 
           <label class="checkbox">
@@ -52,9 +59,8 @@
           <button class="btn btn-ghost2" @click="back" :disabled="syncing || !online">
             ← Volver
           </button>
-
           <p v-if="error" class="terms__p" style="opacity:.7">
-            Error cargando contenido.
+            contenido cargado modo offline.
           </p>
         </div>
 
@@ -160,6 +166,20 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
 
+
+const { status, ping } = useNetworkStatus({
+  pingUrl: '/api/ping-moleculer',
+  verify: true,
+  intervalMs: 10_000,
+  timeoutMs: 4_000
+})
+
+const online = computed(() => status.value.online)
+
+const { guion, paragraphs, pendingx, error, source, refresh } = useTerms(online)
+
+
+
 type MediaMeta = { sizeBytes: number; durationSec: number | null }
 type UiStep = 'rut' | 'terms'
 
@@ -195,19 +215,13 @@ const sortedPending = computed(() => [...pending.value].sort((a, b) => b.created
 const uiStep = ref<UiStep>('rut')
 const termsAccepted = ref(false)
 
-const { guion, paragraphs, error } = useTerms()
+
+
 
 
 const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
 
-const { status, ping } = useNetworkStatus({
-  pingUrl: '/api/ping-moleculer',
-  verify: true,
-  intervalMs: 10_000,
-  timeoutMs: 4_000
-})
 
-const online = computed(() => status.value.online)
 
 const topAnchorEl = ref<HTMLElement | null>(null)
 const previewAnchorEl = ref<HTMLElement | null>(null)
@@ -1038,8 +1052,11 @@ onMounted(async () => {
 
   await refreshPending()
   await ping()
+  
   await primePermissions()
   await loadVideoDevices()
+  await refresh()
+  
 
   for (const item of pending.value as any[]) scheduleAutoSend(item)
 
@@ -1249,7 +1266,6 @@ button:disabled {
   justify-self: start;
 }
 
-/* Floating video (draggable + resizable) */
 .draggable-resizable {
   position: fixed;
   z-index: 9999;
@@ -1266,22 +1282,6 @@ button:disabled {
   height: auto;
   display: block;
 }
-
-/* .video-float__dragbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  background: rgba(18, 24, 38, 0.78);
-  backdrop-filter: blur(6px);
-  cursor: grab;
-  user-select: none;
-}
-
-.video-float__dragbar:active {
-  cursor: grabbing;
-} */
 
 .video-float__dragdot {
   opacity: 0.85;
