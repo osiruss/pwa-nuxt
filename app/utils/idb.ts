@@ -12,24 +12,48 @@ export type StoredCase = {
 }
 
 const DB_NAME = 'afiliacion-offline'
-const DB_VERSION = 1
 const STORE = 'cases'
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    // ✅ abre sin versión: toma la versión más alta existente
+    const req = indexedDB.open(DB_NAME)
 
     req.onupgradeneeded = () => {
       const db = req.result
-
       if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id' })
-        store.createIndex('status', 'status', { unique: false })
-        store.createIndex('createdAt', 'createdAt', { unique: false })
+        const store = db.createObjectStore(STORE, { keyPath: "id" })
+        store.createIndex("status", "status", { unique: false })
+        store.createIndex("createdAt", "createdAt", { unique: false })
       }
     }
 
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      const db = req.result
+
+      // ✅ si abrió pero NO existe el store (DB vieja creada sin "cases"),
+      // forzamos upgrade a version+1 para crearlo
+      if (!db.objectStoreNames.contains(STORE)) {
+        const nextVersion = (db.version || 1) + 1
+        db.close()
+
+        const req2 = indexedDB.open(DB_NAME, nextVersion)
+        req2.onupgradeneeded = () => {
+          const db2 = req2.result
+          if (!db2.objectStoreNames.contains(STORE)) {
+            const store = db2.createObjectStore(STORE, { keyPath: "id" })
+            store.createIndex("status", "status", { unique: false })
+            store.createIndex("createdAt", "createdAt", { unique: false })
+          }
+        }
+        req2.onsuccess = () => resolve(req2.result)
+        req2.onerror = () => reject(req2.error)
+        return
+      }
+
+      resolve(db)
+    }
+
     req.onerror = () => reject(req.error)
   })
 }

@@ -1,16 +1,13 @@
 <template>
-  <UApp>
-    <!-- <OpsStatusBar
-      :onSync="syncPending"
-      @openPending="pendingOpen = true"
-    /> -->
-    <!-- <PendingListModal
-      v-model="pendingOpen"
-      :onUpload="uploadCase"
-      @changed="handlePendingChanged"
-    /> -->
-    <NuxtPage />
-  </UApp>
+  <ClientOnly>
+    <UApp>
+      <NuxtPage />
+    </UApp>
+
+    <template #fallback>
+      <div></div>
+    </template>
+  </ClientOnly>
 </template>
 
 <script setup lang="ts">

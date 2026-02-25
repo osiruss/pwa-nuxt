@@ -1,6 +1,6 @@
 export default defineNuxtConfig({
   modules: ['@vite-pwa/nuxt', '@nuxt/ui'],
-
+  ssr: false,
   pwa: {
     registerType: 'autoUpdate',
     manifest: {

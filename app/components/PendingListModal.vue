@@ -123,7 +123,6 @@ const emit = defineEmits<{
 }>()
 
 const open = ref<boolean>(props.modelValue)
-console.log("🚀 ~ open:", open)
 const items = ref<StoredCase[]>([])
 const syncing = ref(false)
 

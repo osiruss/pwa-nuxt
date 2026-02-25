@@ -20,14 +20,15 @@ export type GuionRowsResponse = {
  *  IndexedDB minimal KV store
  *  ========================= */
 const DB_NAME = "afiliacion-offline"
-const DB_VERSION = 2
 const STORE_NAME = "kv"
 const CACHE_KEY = "guion:v1"
 
+// variables del guion (persisten para que no se pierdan si recargas)
+const VARS_LS_KEY = "afiliacion:guionVars:v1"
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    // ✅ abre sin versión => abre la versión más alta existente
-    const req = indexedDB.open(DB_NAME)
+    const req = indexedDB.open(DB_NAME) // ✅ sin versión
 
     req.onupgradeneeded = () => {
       const db = req.result
@@ -37,7 +38,7 @@ function openDb(): Promise<IDBDatabase> {
     req.onsuccess = () => {
       const db = req.result
 
-      // ✅ si abrió pero NO existe el store, forzamos upgrade a version+1
+      // ✅ si falta el store, forzamos upgrade version+1
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const nextVersion = (db.version || 1) + 1
         db.close()
@@ -107,11 +108,16 @@ function splitToParagraphs(raw: string): string[] {
   return grouped
 }
 
+function applyTemplate(text: string, vars: Record<string, string>) {
+  return (text || "").replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_, key) => {
+    const v = vars[key]
+    return (v ?? "").trim() || `{{${key}}}` // si no está, deja el token visible
+  })
+}
+
 /** =========================
  *  Composable
- *  =========================
- *  onlineRef: boolean que viene de tu ping (computed/ref)
- */
+ *  ========================= */
 export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) => {
   const config = useRuntimeConfig()
 
@@ -120,7 +126,59 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
   const error = ref<unknown>(null)
   const source = ref<"api" | "cache" | "none">("none")
 
-  const paragraphs = computed(() => splitToParagraphs(guion.value?.texto ?? ""))
+
+  const vars = ref<Record<string, string>>({
+    nombre: "",
+    nombreEjecutivo: "",
+    rutAfiliado: "",
+    fecha: "",
+    hora: ""
+  })
+
+  // cargar vars desde localStorage
+  const loadVars = () => {
+    if (!import.meta.client) return
+    try {
+      const raw = localStorage.getItem(VARS_LS_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === "object") vars.value = { ...vars.value, ...parsed }
+    } catch {
+      // ignore
+    }
+  }
+
+  const saveVars = () => {
+    if (!import.meta.client) return
+    try {
+      localStorage.setItem(VARS_LS_KEY, JSON.stringify(vars.value))
+    } catch {
+      // ignore
+    }
+  }
+
+  function setVar(key: string, value: string) {
+    vars.value = { ...vars.value, [key]: value ?? "" }
+    saveVars()
+  }
+
+  function resetVars() {
+    vars.value = {
+      nombre: "",
+      nombreEjecutivo: "",
+      rutAfiliado: "",
+      fecha: "",
+      hora: ""
+    }
+    saveVars()
+  }
+
+  // ✅ texto final renderizado (con reemplazos)
+  const renderedTitle = computed(() => applyTemplate(guion.value?.titulo ?? "", vars.value))
+  const renderedText = computed(() => applyTemplate(guion.value?.texto ?? "", vars.value))
+
+  // ✅ ahora los párrafos salen del texto renderizado (ya reemplazado)
+  const paragraphs = computed(() => splitToParagraphs(renderedText.value))
 
   const readCache = async () => {
     const cached = await idbGet<GuionRow>(CACHE_KEY)
@@ -136,12 +194,9 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
   }
 
   const isOnline = () => {
-    // prioridad: el online que tú pasas (ping)
     if (typeof onlineRef === "boolean") return onlineRef
     if (typeof onlineRef === "function") return !!onlineRef()
     if (onlineRef && typeof (onlineRef as any).value !== "undefined") return !!(onlineRef as any).value
-
-    // fallback: navigator (por si no pasaste nada)
     if (import.meta.client) return navigator.onLine !== false
     return true
   }
@@ -151,17 +206,17 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
     error.value = null
     source.value = "none"
 
-    // OFFLINE (por ping): solo cache
+    // OFFLINE: solo cache
     if (!isOnline()) {
       await readCache()
       pendingx.value = false
       return
     }
 
-    // ONLINE: API → cache; si falla, fallback cache
+    // ONLINE: API → cache; si falla, cache
     try {
       const res = await $fetch<GuionRowsResponse>("/tracking/guion", {
-        baseURL: 'http://localhost:3001' //config.public.apiBase
+        baseURL: "http://localhost:3001" // config.public.apiBase
       })
 
       const doc = res?.rows?.[0] ?? null
@@ -179,22 +234,38 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
   }
 
   if (import.meta.client) {
-  // 1) al montar: pinta cache inmediato, y si estás online por ping, pega al API
-  onMounted(async () => {
-    await readCache()
-    if (isOnline()) await refresh()
-  })
+    onMounted(async () => {
+      loadVars()
 
-  // 2) cuando pase de OFFLINE -> ONLINE (por ping), pega al API
-  if (onlineRef && typeof onlineRef !== "boolean") {
-    watch(
-      () => (typeof onlineRef === "function" ? onlineRef() : (onlineRef as any).value),
-      (now: boolean, prev: boolean) => {
-        if (!prev && now) refresh()
-      }
-    )
+      // pinta cache rápido
+      await readCache()
+
+      // si estás online (ping), pega a API
+      if (isOnline()) await refresh()
+    })
+
+    // cuando pase OFFLINE -> ONLINE, pega al API
+    if (onlineRef && typeof onlineRef !== "boolean") {
+      watch(
+        () => (typeof onlineRef === "function" ? onlineRef() : (onlineRef as any).value),
+        (now: boolean, prev: boolean) => {
+          if (!prev && now) refresh()
+        }
+      )
+    }
   }
-}
 
-  return { guion, paragraphs, pendingx, error, source, refresh }
+  return {
+    guion,
+    renderedTitle,
+    renderedText,
+    paragraphs,
+    vars,
+    setVar,
+    resetVars,
+    pendingx,
+    error,
+    source,
+    refresh
+  }
 }
