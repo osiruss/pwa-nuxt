@@ -2,186 +2,97 @@
   <main class="page">
     <section class="card">
       <button class="btn-home" type="button" @click="goHome" title="Volver al selector">x</button>
+
       <div ref="topAnchorEl" class="top-anchor"></div>
-      <div v-show="termsAccepted && cameraOn" ref="videoFloatEl" class="video-float draggable-resizable"
-        :style="videoFloatStyle">
+
+      <div
+        v-show="termsAccepted && cameraOn"
+        ref="videoFloatEl"
+        class="video-float draggable-resizable"
+        :style="videoFloatStyle"
+      >
         <video ref="videoEl" autoplay playsinline muted class="video-float__video"></video>
-
         <div class="video-float__drag" @pointerdown="onDragPointerDown" title="Mover"></div>
-
         <div class="video-float__resize" @pointerdown="onResizePointerDown" title="Redimensionar"></div>
       </div>
+
       <p class="status">
         Estado conexión: <b>{{ online ? 'ONLINE' : 'OFFLINE' }}</b>
         <small v-if="status.mode === 'verified'"> (verificado)</small>
       </p>
-      <div v-if="uiStep === 'rut'" class="stack">
-        <label class="field">
-          <span class="label">RUT pensionado</span>
-          <input v-model.trim="rut" placeholder="12.345.678-9" class="input" />
-        </label>
 
-        <button class="btn" @click="goToTerms" :disabled="!isRutReady">Continuar</button>
+      <!-- STEP: RUT -->
+      <RutStep v-if="uiStep === 'rut'" v-model:rut="rut" :disabled="!isRutReady" @continue="goToTerms" />
 
-        <small class="hint">Ingresa el RUT para continuar.</small>
-      </div>
+      <!-- STEP: TERMS + FLOW -->
       <div v-else class="stack">
-
-        <label class="field">
-          <span class="label">RUT pensionado</span>
-          <input v-model.trim="rut" placeholder="12.345.678-9" class="input" />
-        </label>
-        <!-- Terms -->
-        <div class="terms">
-          <h2 class="terms__title">{{ renderedTitle || (pendingx ? 'Cargando…' : 'Sin titulo') }}</h2>
-
-          <p v-for="(p, i) in paragraphs" :key="i" class="terms__p">
-            {{ p }}
-          </p>
-
-          <p v-if="source === 'cache'" style="opacity:.7">
-            Estás viendo una copia offline guardada.
-          </p>
-          <p v-else-if="error && !paragraphs" style="opacity:.7">
-            No se pudo cargar el contenido.
-          </p>
-
-          <label class="checkbox">
-            <input type="checkbox" v-model="termsAccepted" />
-            <span>He leído las condiciones.</span>
-          </label>
-
-          <button class="btn btn-ghost2" @click="back" :disabled="syncing || !online">
-            ← Volver
-          </button>
-
-          <button class="btn" type="button" @click="toggleVarsForm">📝 Ingresar datos</button>
-          <!-- FORMUALRIO INGRESO DE DATOS -->
-          <div v-if="showVarsForm" class="vars-panel">
-            <label class="field">
-              <span class="label">Nombre pensionado(a)</span>
-              <input class="input" :value="vars.nombre"
-                @input="setVar('nombre', ($event.target as HTMLInputElement).value)" />
-            </label>
-
-            <label class="field">
-              <span class="label">Rut Afiliado</span>
-              <input class="input" :value="vars.rutAfiliado"
-                @input="setVar('rutAfiliado', ($event.target as HTMLInputElement).value)" />
-            </label>
-
-            <label class="field">
-              <span class="label">Nombre Ejecutivo</span>
-              <input class="input" :value="vars.nombreEjecutivo"
-                @input="setVar('nombreEjecutivo', ($event.target as HTMLInputElement).value)" />
-            </label>
-
-            <label class="field">
-              <span class="label">Fecha</span>
-              <input class="input" :value="vars.fecha"
-                @input="setVar('fecha', ($event.target as HTMLInputElement).value)" />
-            </label>
-
-            <label class="field">
-              <span class="label">Hora</span>
-              <input class="input" :value="vars.hora"
-                @input="setVar('hora', ($event.target as HTMLInputElement).value)" />
-            </label>
-
-            <div style="display:flex; gap:8px; margin-top:8px;">
-              <button class="btn" type="button" @click="showVarsForm = false">
-                Guardar
-              </button>
-
-              <button class="btn" type="button" @click="resetVars">Limpiar</button>
-            </div>
-          </div>
-
-          <p v-if="error" class="terms__p" style="opacity:.7">
-            contenido cargado modo offline.
-          </p>
-        </div>
+        <TermsPanel
+          v-model:rut="rut"
+          v-model:accepted="termsAccepted"
+          :renderedTitle="renderedTitle"
+          :pendingx="pendingx"
+          :paragraphs="paragraphs"
+          :error="error"
+          :source="source"
+          :online="online"
+          :syncing="syncing"
+          :showVarsForm="showVarsForm"
+          :vars="vars"
+          @toggleVarsForm="toggleVarsForm"
+          @closeVarsForm="showVarsForm = false"
+          @resetVars="resetVars"
+          @setVar="setVar"
+          @back="back"
+        />
 
         <div v-if="termsAccepted" class="stack">
-          <label class="field">
-            <span class="label">Cámara</span>
-            <select v-model="selectedDeviceId" :disabled="!videoInputs.length || recording" class="input">
-              <option value="">(Automática)</option>
-              <option v-for="d in videoInputs" :key="d.deviceId" :value="d.deviceId">
-                {{ d.label || `Cámara ${d.deviceId.slice(0, 6)}…` }}
-              </option>
-            </select>
-          </label>
+          <CameraPanel
+            v-model:selectedDeviceId="selectedDeviceId"
+            :videoInputs="videoInputs"
+            :recording="recording"
+            :cameraOn="cameraOn"
+            :syncing="syncing"
+            :online="online"
+            :pendingCount="pendingCount"
+            :readyExpiredCount="readyExpiredCount"
+            :lastPreviewUrl="lastPreviewUrl"
+            @startCamera="startCamera"
+            @stopCamera="stopCamera"
+            @openFilePicker="openFilePicker"
+            @syncPending="syncPending"
+          >
+            <template #fileInput>
+              <input
+                ref="fileInputEl"
+                type="file"
+                accept="video/*"
+                capture="environment"
+                class="hidden"
+                @change="onFileSelected"
+              />
+            </template>
 
-          <div class="actions">
-            <button class="btn" @click="startCamera" :disabled="cameraOn">🎥 Encender cámara</button>
-            <button class="btn" @click="stopCamera" :disabled="!cameraOn">⛔ Apagar cámara</button>
+            <PendingList
+              :items="sortedPending"
+              :mediaMeta="mediaMeta"
+              :syncing="syncing"
+              :online="online"
+              :formatBytes="formatBytes"
+              :formatDuration="formatDuration"
+              :formatDate="formatDate"
+              :badgeStyle="badgeStyle"
+              :remainingText="remainingText"
+              @refresh="refreshPending"
+              @edit="editPendingVideo"
+              @preview="previewPending"
+              @download="downloadPending"
+              @confirm="confirmPending"
+              @syncOne="syncOne"
+              @remove="removePending"
+            />
 
-            <button class="btn" @click="openFilePicker" :disabled="syncing">📎 Adjuntar video</button>
-            <input ref="fileInputEl" type="file" accept="video/*" capture="environment" class="hidden"
-              @change="onFileSelected" />
-
-            <button class="btn" @click="syncPending" :disabled="syncing || !online">🔄 Enviar confirmados</button>
-          </div>
-
-          <p class="meta">
-            Pendientes: <b>{{ pendingCount }}</b>
-            — Confirmados vencidos (auto): <b>{{ readyExpiredCount }}</b>
-          </p>
-
-          <div v-if="lastPreviewUrl" ref="previewAnchorEl" class="preview">
-            <h3 class="subtitle">Última grabación (preview)</h3>
-            <video :src="lastPreviewUrl" controls class="preview__video"></video>
-          </div>
-
-          <div v-if="pending.length" class="pending">
-            <div class="pending__head">
-              <h3 class="subtitle">📋 Pendientes ({{ pending.length }})</h3>
-              <button class="btn" @click="refreshPending" :disabled="syncing">🔁 Actualizar</button>
-            </div>
-
-            <div class="pending__list">
-              <div v-for="item in sortedPending" :key="item.id" class="pending__item">
-                <div class="pending__info">
-                  <div class="pending__rut">RUT: {{ item.rut }}</div>
-                  <div class="pending__sub">{{ formatDate(item.createdAt) }} · ID: {{ item.id }}</div>
-
-                  <div class="pending__sub">
-                    ⏱ {{ formatDuration(mediaMeta[item.id]?.durationSec ?? null) }}
-                    · 💾 {{ formatBytes(mediaMeta[item.id]?.sizeBytes ?? 0) }}
-                  </div>
-
-                  <div v-if="item.status === 'ready' && item.confirmedAt" class="pending__sub">
-                    Confirmado: {{ formatDate(item.confirmedAt) }} · Auto-envío en: {{ remainingText(item) }}
-                  </div>
-                </div>
-
-                <div class="pending__actions">
-                  <span :style="badgeStyle(item.status)">{{ item.status }}</span>
-                  <button class="btn" @click="editPendingVideo(item)" :disabled="syncing">
-                    ✏️ Editar video
-                  </button>
-
-                  <button class="btn" @click="previewPending(item)">▶️ Ver</button>
-                  <button @click="downloadPending(item)">⬇️ Descargar</button>
-
-                  <button v-if="item.status === 'review'" class="btn" @click="confirmPending(item)" :disabled="syncing">
-                    ✅ Confirmar
-                  </button>
-
-                  <button class="btn" @click="syncOne(item)" :disabled="syncing || !online || item.status !== 'ready'">
-                    ⬆️ Subir
-                  </button>
-
-                  <button class="btn" @click="removePending(item.id)" :disabled="syncing">🗑️</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="empty">No hay pendientes.</div>
-
-          <div v-if="msg" class="msg">{{ msg }}</div>
+            <div v-if="msg" class="msg">{{ msg }}</div>
+          </CameraPanel>
         </div>
 
         <div v-else class="empty">
@@ -202,11 +113,20 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
 
+import RutStep from '~/components/affiliacion/RutStep.vue'
+import TermsPanel from '~/components/affiliacion/TermsPanel.vue'
+import CameraPanel from '~/components/affiliacion/CameraPanel.vue'
+import PendingList from '~/components/affiliacion/PendingList.vue'
+
+import { useDevices } from '~/composables/useDevices'
+import { useFloatingVideo } from '~/composables/useFloatingVideo'
+
+import { useAnchorsPreview } from '~/composables/useAnchorsPreview'
+import { usePendingCases } from '~/composables/usePendingCases'
+
 const router = useRouter()
 
-
 const { override, modeLabel } = useConnectivityMode()
-
 
 const { status, ping } = useNetworkStatus({
   pingUrl: '/api/ping-moleculer',
@@ -215,27 +135,45 @@ const { status, ping } = useNetworkStatus({
   timeoutMs: 4_000
 })
 
-// 3) DESPUÉS: online final (override manda)
 const online = computed(() => {
   if (override.value !== null) return override.value
   return status.value.online
 })
 
-// 4) DESPUÉS: composables que dependen de online
+const { videoInputs, selectedDeviceId, primePermissions, loadVideoDevices, handleSelectedDeviceChange } = useDevices()
+
 const { renderedTitle, paragraphs, vars, setVar, pendingx, error, source } = useTerms(online)
 
 
-
-type MediaMeta = { sizeBytes: number; durationSec: number | null }
 type UiStep = 'rut' | 'terms'
-
 
 const editingId = ref<string | null>(null)
 const editingOriginal = ref<any | null>(null)
 
-
 const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
+
 const AUTO_CHECK_EVERY_MS = 30 * 1000
+
+const {
+  pending,
+  mediaMeta,
+  pendingCount,
+  sortedPending,
+  toPlainCase,
+  refreshPending,
+  replaceVideoOnItem,
+  removePending: removePendingFromStore,
+  confirmToReady,
+  isReadyExpired,
+  readyExpiredCount,
+  remainingText
+} = usePendingCases({
+  idbGetAll,
+  idbPut,
+  idbDelete,
+  autoSendAfterMs: AUTO_SEND_AFTER_MS
+})
+
 
 const rut = ref('')
 const msg = ref('')
@@ -251,46 +189,25 @@ const recording = ref(false)
 const chunks = ref<Blob[]>([])
 const lastPreviewUrl = ref('')
 
-const syncing = ref(false)
-const pending = ref<StoredCase[]>([])
-const mediaMeta = ref<Record<string, MediaMeta>>({})
+const { topAnchorEl, previewAnchorEl, scrollToTopAnchor, scrollToPreview, cleanupPreview } = useAnchorsPreview({
+  lastPreviewUrl
+})
 
-const pendingCount = computed(() => pending.value.length)
-const sortedPending = computed(() => [...pending.value].sort((a, b) => b.createdAt - a.createdAt))
+const syncing = ref(false)
+
 
 const uiStep = ref<UiStep>('rut')
 const termsAccepted = ref(false)
 const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
-const topAnchorEl = ref<HTMLElement | null>(null)
-const previewAnchorEl = ref<HTMLElement | null>(null)
-const videoFloatEl = ref<HTMLElement | null>(null)
 
-const floatX = ref(14)
-const floatY = ref(14)
-const floatW = ref(100)
 
-const MIN_W = 100
-const MAX_W = 520
 
-let dragging = false
-let resizing = false
-let dragStartX = 0
-let dragStartY = 0
-let dragOriginX = 0
-let dragOriginY = 0
-let resizeStartX = 0
-let resizeOriginW = 0
+/* ✅ Video flotante ahora 100% en composable */
+const floatEnabled = computed(() => termsAccepted.value && cameraOn.value)
 
-const videoFloatStyle = computed(() => ({
-  left: `${floatX.value}px`,
-  top: `${floatY.value}px`,
-  width: `${floatW.value}px`
-}))
-
-/** Camera device selection */
-const videoInputs = ref<MediaDeviceInfo[]>([])
-const selectedDeviceId = ref('')
-const permissionPrimed = ref(false)
+const { videoFloatEl, videoFloatStyle, onDragPointerDown, onResizePointerDown } = useFloatingVideo({
+  enabled: floatEnabled
+})
 
 /** Auto send */
 let autoTimer: ReturnType<typeof setInterval> | null = null
@@ -300,7 +217,6 @@ const { setAuto } = useConnectivityMode()
 const showVarsForm = ref(false)
 
 /* ------------------------ UI helpers ------------------------ */
-
 function extFromMime(mime: string) {
   const m = (mime || '').toLowerCase()
   if (m.includes('mp4')) return 'mp4'
@@ -320,10 +236,18 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click()
   a.remove()
 
-  // revoca luego para no cortar descarga en algunos browsers
   setTimeout(() => {
-    try { URL.revokeObjectURL(url) } catch { }
+    try {
+      URL.revokeObjectURL(url)
+    } catch {}
   }, 1500)
+}
+
+
+async function confirmPending(item: any) {
+  const updated = await confirmToReady(item)
+  scheduleAutoSend(updated)
+  setMsg(`Confirmado: ${updated.id}. Se enviará automático en 1 minuto si no lo envías manualmente.`)
 }
 
 function downloadPending(item: any) {
@@ -373,25 +297,16 @@ function resetToStartAfterDelay(ms = 3000) {
   }, ms)
 }
 
-function cleanupPreview() {
-  try {
-    if (lastPreviewUrl.value) URL.revokeObjectURL(lastPreviewUrl.value)
-  } catch { }
-  lastPreviewUrl.value = ''
-}
+
 
 function shouldResetAfterSync() {
   const remaining = pending.value.filter((x: any) => x.status === 'review' || x.status === 'ready')
   return remaining.length === 0
 }
 
-function scrollToTopAnchor() {
-  requestAnimationFrame(() => topAnchorEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-}
 
-function scrollToPreview() {
-  requestAnimationFrame(() => previewAnchorEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-}
+
+
 
 /* ------------------------ Formatting ------------------------ */
 function formatBytes(bytes: number) {
@@ -429,133 +344,9 @@ function badgeStyle(s: any) {
   return base + ' background:#f5f5f5; color:#333; border:1px solid #ddd;'
 }
 
-/* ------------------------ Floating camera logic ------------------------ */
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n))
-}
-
-function keepInsideViewport(nextX: number, nextY: number, w: number) {
-  const margin = 8
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const h = videoFloatEl.value?.getBoundingClientRect().height ?? 200
-  const x = clamp(nextX, margin, vw - w - margin)
-  const y = clamp(nextY, margin, vh - h - margin)
-  return { x, y }
-}
-
-function getInitialFloatWidth() {
-  const vw = window.innerWidth
-  const base = 100
-  if (vw < 480) return Math.max(base, vw * 0.6)
-  if (vw < 900) return Math.max(base, vw * 0.4)
-  return Math.max(base, Math.min(360, vw * 0.25))
-}
-
-function snapOverlayIntoViewport() {
-  const bounded = keepInsideViewport(floatX.value, floatY.value, floatW.value)
-  floatX.value = bounded.x
-  floatY.value = bounded.y
-}
-
-function onDragPointerDown(ev: PointerEvent) {
-  if (!termsAccepted.value || !cameraOn.value) return
-
-  dragging = true
-  dragStartX = ev.clientX
-  dragStartY = ev.clientY
-  dragOriginX = floatX.value
-  dragOriginY = floatY.value
-
-    ; (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
-  window.addEventListener('pointermove', onPointerMove, { passive: false })
-  window.addEventListener('pointerup', onPointerUp, { passive: true })
-}
-
-function onResizePointerDown(ev: PointerEvent) {
-  if (!termsAccepted.value || !cameraOn.value) return
-
-  resizing = true
-  resizeStartX = ev.clientX
-  resizeOriginW = floatW.value
-
-    ; (ev.currentTarget as HTMLElement)?.setPointerCapture?.(ev.pointerId)
-  window.addEventListener('pointermove', onPointerMove, { passive: false })
-  window.addEventListener('pointerup', onPointerUp, { passive: true })
-}
-
-function onPointerMove(ev: PointerEvent) {
-  if (dragging || resizing) ev.preventDefault()
-
-  if (dragging) {
-    const dx = ev.clientX - dragStartX
-    const dy = ev.clientY - dragStartY
-    const bounded = keepInsideViewport(dragOriginX + dx, dragOriginY + dy, floatW.value)
-    floatX.value = bounded.x
-    floatY.value = bounded.y
-    return
-  }
-
-  if (resizing) {
-    const dx = ev.clientX - resizeStartX
-    const nw = clamp(resizeOriginW + dx, MIN_W, Math.min(MAX_W, window.innerWidth - 16))
-    floatW.value = nw
-    snapOverlayIntoViewport()
-  }
-}
-
-function onPointerUp() {
-  dragging = false
-  resizing = false
-  window.removeEventListener('pointermove', onPointerMove as any)
-  window.removeEventListener('pointerup', onPointerUp as any)
-}
-
 /* ------------------------ Media helpers ------------------------ */
 function uuid(): string {
   return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function toPlainCase(item: any, patch?: Partial<any>) {
-  return {
-    id: item.id,
-    rut: item.rut,
-    createdAt: item.createdAt,
-    mimeType: item.mimeType,
-    chunks: Array.from(item.chunks ?? []),
-    status: item.status,
-    confirmedAt: item.confirmedAt ?? null,
-    ...(patch || {})
-  }
-}
-
-async function replaceVideoOnItem(item: any, patch: {
-  chunks: Blob[],
-  mimeType: string,
-  keepConfirmedAt?: boolean
-}) {
-  const next = toPlainCase(item, {
-    // reemplaza el video
-    chunks: [...patch.chunks],
-    mimeType: patch.mimeType,
-
-    // actualiza timestamps
-    createdAt: Date.now(),
-
-    // al editar, lo mandamos a revisión (o si quieres directo a ready)
-    status: 'review',
-    confirmedAt: patch.keepConfirmedAt ? item.confirmedAt ?? null : null,
-  })
-
-  await idbPut(next as any)
-
-  // recalcular meta (duración/peso)
-  computeMetaForItem(next)
-    .then((meta) => (mediaMeta.value = { ...mediaMeta.value, [next.id]: meta }))
-    .catch(() => (mediaMeta.value = { ...mediaMeta.value, [next.id]: { sizeBytes: 0, durationSec: null } }))
-
-  await refreshPending()
-  return next
 }
 
 async function fileToChunks(file: File, chunkSize = 1024 * 1024) {
@@ -568,92 +359,10 @@ async function fileToChunks(file: File, chunkSize = 1024 * 1024) {
   return out
 }
 
-async function computeMetaForItem(item: any): Promise<MediaMeta> {
-  const blob = new Blob(Array.from(item.chunks ?? []), { type: item.mimeType || 'video/webm' })
-  const sizeBytes = blob.size
-
-  const durationSec = await new Promise<number | null>((resolve) => {
-    const url = URL.createObjectURL(blob)
-    const v = document.createElement('video')
-    v.preload = 'metadata'
-    v.muted = true
-
-    const cleanup = () => {
-      try {
-        URL.revokeObjectURL(url)
-      } catch { }
-    }
-
-    v.onloadedmetadata = () => {
-      const d = Number.isFinite(v.duration) ? v.duration : null
-      cleanup()
-      resolve(d)
-    }
-    v.onerror = () => {
-      cleanup()
-      resolve(null)
-    }
-
-    v.src = url
-  })
-
-  return { sizeBytes, durationSec }
-}
-
-
-
-/* ------------------------ Devices/permissions ------------------------ */
-async function primePermissions() {
-  if (permissionPrimed.value) return
-  try {
-    const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    tmp.getTracks().forEach((t) => t.stop())
-    permissionPrimed.value = true
-  } catch {
-    // silent
-  }
-}
-
-async function loadVideoDevices() {
-  if (!navigator.mediaDevices?.enumerateDevices) {
-    videoInputs.value = []
-    return
-  }
-  const all = await navigator.mediaDevices.enumerateDevices()
-  videoInputs.value = all.filter((d) => d.kind === 'videoinput')
-}
-
 /* ------------------------ Pending/IDB ------------------------ */
-async function refreshPending() {
-  const all = await idbGetAll()
-  pending.value = all.filter((x: any) => x.status === 'review' || x.status === 'ready' || x.status === 'error')
-
-  for (const item of pending.value as any[]) {
-    if (mediaMeta.value[item.id]) continue
-    computeMetaForItem(item)
-      .then((meta) => (mediaMeta.value = { ...mediaMeta.value, [item.id]: meta }))
-      .catch(() => (mediaMeta.value = { ...mediaMeta.value, [item.id]: { sizeBytes: 0, durationSec: null } }))
-  }
-}
 
 /* ------------------------ Auto-send scheduling ------------------------ */
-function isReadyExpired(item: any) {
-  if (item.status !== 'ready') return false
-  const t = Number(item.confirmedAt ?? 0)
-  if (!t) return false
-  return Date.now() - t >= AUTO_SEND_AFTER_MS
-}
 
-const readyExpiredCount = computed(() => pending.value.filter(isReadyExpired).length)
-
-function remainingText(item: any) {
-  if (item.status !== 'ready' || !item.confirmedAt) return '-'
-  const remaining = AUTO_SEND_AFTER_MS - (Date.now() - Number(item.confirmedAt))
-  if (remaining <= 0) return 'vencido (se enviará cuando esté online)'
-  const mins = Math.floor(remaining / 60000)
-  const secs = Math.floor((remaining % 60000) / 1000)
-  return `${mins}m ${secs}s`
-}
 
 function scheduleAutoSend(item: any) {
   if (item.status !== 'ready') return
@@ -690,7 +399,6 @@ async function startCamera() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true })
     } catch {
-      // fallback chain
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
       } catch {
@@ -755,7 +463,6 @@ async function startRecording() {
     cleanupPreview()
     lastPreviewUrl.value = URL.createObjectURL(blob)
 
-    // ✅ SI ESTOY EDITANDO: reemplazo el video del item existente
     if (editingId.value) {
       const current = pending.value.find((x: any) => x.id === editingId.value) || editingOriginal.value
       if (!current) {
@@ -768,7 +475,7 @@ async function startRecording() {
       await replaceVideoOnItem(current, {
         chunks: [...chunks.value],
         mimeType: recorder?.mimeType || 'video/webm',
-        keepConfirmedAt: false,
+        keepConfirmedAt: false
       })
 
       editingId.value = null
@@ -780,7 +487,6 @@ async function startRecording() {
       return
     }
 
-    // ✅ FLUJO NORMAL: crea nuevo item
     const item: any = {
       id: uuid(),
       rut: rut.value,
@@ -798,30 +504,6 @@ async function startRecording() {
     scrollToPreview()
   }
 
-  // recorder.onstop = async () => {
-  //   recording.value = false
-
-  //   const blob = new Blob(chunks.value, { type: recorder?.mimeType || 'video/webm' })
-  //   cleanupPreview()
-  //   lastPreviewUrl.value = URL.createObjectURL(blob)
-
-  //   const item: any = {
-  //     id: uuid(),
-  //     rut: rut.value,
-  //     createdAt: Date.now(),
-  //     status: 'review',
-  //     confirmedAt: null,
-  //     mimeType: recorder?.mimeType || 'video/webm',
-  //     chunks: [...chunks.value]
-  //   }
-
-  //   await idbPut(item as any)
-  //   await refreshPending()
-  //   setMsg('Grabación guardada. Revisa y CONFIRMA para dejar listo para envío.')
-  //   stopCamera()
-  //   scrollToPreview()
-  // }
-
   recorder.start(1000)
   recording.value = true
   setMsg('Grabando...')
@@ -829,6 +511,11 @@ async function startRecording() {
 
 function stopRecording() {
   if (recorder && recording.value) recorder.stop()
+}
+
+async function removePending(id: string) {
+  await removePendingFromStore(id)
+  setMsg(`Pendiente eliminado: ${id}`)
 }
 
 /* ------------------------ File attach ------------------------ */
@@ -861,7 +548,7 @@ async function onFileSelected(ev: Event) {
       await replaceVideoOnItem(current, {
         chunks: chunksArr,
         mimeType,
-        keepConfirmedAt: false,
+        keepConfirmedAt: false
       })
 
       editingId.value = null
@@ -908,7 +595,6 @@ async function editPendingVideo(item: any) {
   if (!termsAccepted.value) return setMsg('Debes aceptar los términos para editar.')
   if (!item?.id) return
 
-  // si estaba ready, evitamos que se envíe por auto-send mientras editas
   if (item.status === 'ready') {
     const updated = toPlainCase(item, { status: 'review', confirmedAt: null })
     await idbPut(updated as any)
@@ -918,20 +604,10 @@ async function editPendingVideo(item: any) {
   editingId.value = item.id
   editingOriginal.value = toPlainCase(item)
 
-  // opcional: previsualiza lo que estás editando
   previewPending(item)
 
-  // enciende cámara para regrabar
   await startCamera()
   setMsg(`Editando video del caso: ${item.id}`)
-}
-
-async function confirmPending(item: any) {
-  const updated = toPlainCase(item, { status: 'ready', confirmedAt: Date.now() })
-  await idbPut(updated as any)
-  await refreshPending()
-  scheduleAutoSend(updated)
-  setMsg(`Confirmado: ${item.id}. Se enviará automático en 1 minuto si no lo envías manualmente.`)
 }
 
 /* ------------------------ Upload / sync ------------------------ */
@@ -1037,12 +713,6 @@ async function syncReadyExpired() {
   }
 }
 
-async function removePending(id: string) {
-  await idbDelete(id)
-  await refreshPending()
-  setMsg(`Pendiente eliminado: ${id}`)
-}
-
 
 function toggleVarsForm() {
   showVarsForm.value = !showVarsForm.value
@@ -1051,18 +721,18 @@ function toggleVarsForm() {
 /* ------------------------ Router ------------------------ */
 function goHome() {
   setAuto()
-  router.push("/")
+  router.push('/')
 }
 
 /* ------------------------ Limpia formulario ingreso de datos guión ------------------------ */
 function resetVars() {
-  Object.keys(vars.value).forEach(k => {
-    vars.value[k] = ""
+  Object.keys(vars.value).forEach((k) => {
+    ;(vars.value as any)[k] = ''
   })
 
   if (import.meta.client) {
     try {
-      localStorage.removeItem("afiliacion:guionVars:v1")
+      localStorage.removeItem('afiliacion:guionVars:v1')
     } catch {}
   }
 }
@@ -1095,31 +765,22 @@ watch(
 watch(
   () => selectedDeviceId.value,
   async (newId, oldId) => {
-    if (newId === oldId) return
-    if (!cameraOn.value) return
-    if (recording.value) {
-      setMsg('No puedes cambiar cámara mientras grabas.')
-      selectedDeviceId.value = oldId || ''
-      return
-    }
-    await startCamera()
+    await handleSelectedDeviceChange({
+      newId,
+      oldId,
+      cameraOn,
+      recording,
+      startCamera,
+      setMsg,
+      revert: (v) => (selectedDeviceId.value = v)
+    })
   }
 )
 
 /* ------------------------ Lifecycle ------------------------ */
 onMounted(async () => {
-  floatW.value = getInitialFloatWidth()
-  snapOverlayIntoViewport()
-
-  const onWinResize = () => {
-    floatW.value = getInitialFloatWidth()
-    snapOverlayIntoViewport()
-  }
-  window.addEventListener('resize', onWinResize)
-
   await refreshPending()
 
-  console.log("🚀 ~ override.value:", override.value)
   if (override.value === null) {
     await ping()
   }
@@ -1127,16 +788,11 @@ onMounted(async () => {
   await primePermissions()
   await loadVideoDevices()
 
-
   for (const item of pending.value as any[]) scheduleAutoSend(item)
 
   autoTimer = setInterval(() => {
     syncReadyExpired()
   }, AUTO_CHECK_EVERY_MS)
-
-  onBeforeUnmount(() => {
-    window.removeEventListener('resize', onWinResize)
-  })
 })
 
 onBeforeUnmount(() => {
@@ -1146,9 +802,6 @@ onBeforeUnmount(() => {
   if (autoTimer) clearInterval(autoTimer)
   for (const t of autoTimeouts.values()) clearTimeout(t)
   autoTimeouts.clear()
-
-  window.removeEventListener('pointermove', onPointerMove as any)
-  window.removeEventListener('pointerup', onPointerUp as any)
 })
 </script>
 
@@ -1177,47 +830,41 @@ onBeforeUnmount(() => {
   font-size: 10px;
 }
 
-.stack {
+/* ✅ Estas clases ahora viven dentro de componentes, por eso :deep */
+:deep(.stack) {
   display: grid;
   gap: 12px;
 }
 
-.title {
-  margin: 0;
-}
-
-.subtitle {
-  margin: 0;
-}
-
-.field {
+:deep(.field) {
   display: grid;
   gap: 6px;
 }
 
-.label {
+:deep(.label) {
   font-size: 12px;
   opacity: 0.9;
 }
 
-.input {
+:deep(.input) {
   width: 100%;
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 10px;
+  box-sizing: border-box;
 }
 
-.hint {
+:deep(.hint) {
   opacity: 0.7;
 }
 
-.actions {
+:deep(.actions) {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.meta {
+:deep(.meta) {
   margin: 0;
 }
 
@@ -1225,7 +872,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.terms {
+:deep(.terms) {
   padding: 12px 14px;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
@@ -1234,49 +881,49 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-.terms__title {
+:deep(.terms__title) {
   margin: 0;
 }
 
-.terms__p {
+:deep(.terms__p) {
   margin: 0;
   line-height: 1.4;
 }
 
-.checkbox {
+:deep(.checkbox) {
   display: flex;
   gap: 10px;
   align-items: flex-start;
 }
 
-.preview {
+:deep(.preview) {
   margin-top: 12px;
 }
 
-.preview__video {
+:deep(.preview__video) {
   width: 100%;
   border-radius: 12px;
 }
 
-.pending {
+:deep(.pending) {
   margin-top: 14px;
 }
 
-.pending__head {
+:deep(.pending__head) {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.pending__list {
+:deep(.pending__list) {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-top: 10px;
 }
 
-.pending__item {
+:deep(.pending__item) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1287,22 +934,22 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
-.pending__info {
+:deep(.pending__info) {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.pending__rut {
+:deep(.pending__rut) {
   font-weight: 700;
 }
 
-.pending__sub {
+:deep(.pending__sub) {
   font-size: 12px;
   opacity: 0.75;
 }
 
-.pending__actions {
+:deep(.pending__actions) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1310,16 +957,17 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
-.empty,
-.msg {
+:deep(.empty),
+:deep(.msg) {
   margin-top: 14px;
   padding: 10px;
   border-radius: 10px;
   background: #f5f5f5;
 }
 
-button.btn,
-button {
+/* ✅ botones dentro de componentes */
+:deep(button.btn),
+:deep(button) {
   padding: 10px 12px;
   border: 1px solid #ccc;
   background: white;
@@ -1327,15 +975,16 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+:deep(button:disabled) {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn-ghost2 {
+:deep(.btn-ghost2) {
   justify-self: start;
 }
 
+/* Floating video */
 .draggable-resizable {
   position: fixed;
   z-index: 9999;
@@ -1353,35 +1002,53 @@ button:disabled {
   display: block;
 }
 
-.video-float__dragdot {
-  opacity: 0.85;
-  font-size: 16px;
-  line-height: 1;
+/* Drag icon */
+.video-float__drag {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  cursor: grab;
+  z-index: 2;
+  pointer-events: auto;
 }
 
-.video-float__dragtext {
-  opacity: 0.85;
-  font-size: 12px;
+.video-float__drag:active {
+  cursor: grabbing;
+}
+
+.video-float__drag::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.75) 2px, transparent 3px) 0 0 / 8px 8px;
+  opacity: 0.95;
 }
 
 .video-float__resize {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   cursor: nwse-resize;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .video-float__resize::before {
-  content: '';
+  content: "";
   position: absolute;
-  inset: 5px;
-  border-right: 2px solid rgba(255, 255, 255, 0.55);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.55);
+  inset: 6px;
+  border-right: 2px solid rgba(255, 255, 255, 0.65);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.65);
   border-radius: 4px;
 }
 
@@ -1437,77 +1104,6 @@ button:disabled {
   cursor: pointer;
 }
 
-
-.draggable-resizable {
-  position: fixed;
-  z-index: 9999;
-  border-radius: 14px;
-  overflow: hidden;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, .18);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, .28);
-  touch-action: none;
-  /* CLAVE para drag en móvil */
-}
-
-.video-float__video {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* Drag icon */
-.video-float__drag {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .12);
-  border: 1px solid rgba(255, 255, 255, .28);
-  cursor: grab;
-  z-index: 2;
-  /* CLAVE: que quede sobre el video */
-  pointer-events: auto;
-}
-
-.video-float__drag:active {
-  cursor: grabbing;
-}
-
-.video-float__drag::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, .75) 2px, transparent 3px) 0 0 / 8px 8px;
-  opacity: .95;
-}
-
-.video-float__resize {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .12);
-  border: 1px solid rgba(255, 255, 255, .28);
-  cursor: nwse-resize;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.video-float__resize::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-right: 2px solid rgba(255, 255, 255, .65);
-  border-bottom: 2px solid rgba(255, 255, 255, .65);
-  border-radius: 4px;
-}
-
 .btn-home {
   position: absolute;
   top: 5px;
@@ -1534,7 +1130,7 @@ button:disabled {
   transform: scale(0.98);
 }
 
-.vars-panel {
+:deep(.vars-panel) {
   margin-top: 10px;
   padding: 14px;
   border: 1px solid #e5e5e5;
@@ -1542,9 +1138,5 @@ button:disabled {
   background: #fafafa;
   display: grid;
   gap: 10px;
-}
-
-.input{
-  width: auto;
 }
 </style>
