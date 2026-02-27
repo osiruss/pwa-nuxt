@@ -54,7 +54,25 @@ export default defineNuxtConfig({
   pwa: {
     registerType: 'autoUpdate',
     strategies: 'generateSW',
-
+    workbox: {
+      navigateFallback: '/',
+      navigateFallbackDenylist: [/^\/api\//],
+       additionalManifestEntries: [
+      { url: '/', revision: null }
+    ],
+      globPatterns: ['**/*.{html,js,css,ico,png,svg,webmanifest,woff2}'],
+      globIgnores: ['**/sw.js', '**/workbox-*.js'],
+      runtimeCaching: [
+        {
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'pages',
+            networkTimeoutSeconds: 3
+          }
+        }
+      ]
+    },
     manifest: {
       name: 'POC Afiliación Offline',
       short_name: 'Afiliación',
@@ -69,23 +87,7 @@ export default defineNuxtConfig({
       ]
     },
 
-    workbox: {
-      navigateFallback: '/index.html',
-      navigateFallbackDenylist: [/^\/api\//],
-      globPatterns: ['**/*.{html,js,css,ico,png,svg,webmanifest,woff2}'],
-      globIgnores: ['**/sw.js', '**/workbox-*.js'],
-      runtimeCaching: [
-        {
-          urlPattern: ({ request }) => request.mode === 'navigate',
-          handler: 'NetworkFirst',
-          options: {
-            cacheName: 'pages',
-            networkTimeoutSeconds: 3
-          }
-        }
-      ]
-    },
-
+  
     devOptions: {
       enabled: false
     }
