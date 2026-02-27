@@ -1,6 +1,6 @@
 import { ref, computed, onMounted } from "vue"
 
-type ConnectivityOverride = null | boolean // null = usar ping, true/false = forzar
+type ConnectivityOverride = null | boolean
 
 const LS_KEY = "afiliacion:connectivityOverride:v1"
 

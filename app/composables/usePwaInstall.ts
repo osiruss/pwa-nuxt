@@ -1,4 +1,3 @@
-// composables/usePwaInstall.ts
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 export function usePwaInstall() {
@@ -49,7 +48,6 @@ export function usePwaInstall() {
     await refreshDebug()
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
     window.addEventListener('appinstalled', onAppInstalled)
-    // refresca después de 1s por si el SW toma control tras recarga
     setTimeout(refreshDebug, 1000)
   })
 

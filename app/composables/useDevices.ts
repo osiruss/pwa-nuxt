@@ -11,9 +11,7 @@ export function useDevices() {
       const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       tmp.getTracks().forEach((t) => t.stop())
       permissionPrimed.value = true
-    } catch {
-      // silent
-    }
+    } catch {}
   }
 
   async function loadVideoDevices() {
@@ -25,12 +23,7 @@ export function useDevices() {
     videoInputs.value = all.filter((d) => d.kind === 'videoinput')
   }
 
-  /**
-   * Encapsula la regla de negocio "si estás grabando no cambies cámara"
-   * y "si no está la cámara encendida no hagas nada".
-   *
-   * Inyectamos startCamera y setMsg para no acoplar el composable.
-   */
+
   async function handleSelectedDeviceChange(args: {
     newId: string
     oldId: string

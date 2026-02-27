@@ -19,11 +19,7 @@ export function useMediaCapture(args: {
 
     idbPut: (doc: any) => Promise<any>
     pending: Ref<any[]>
-
-    // ✅ ahora viene desde app.vue (una sola fuente de verdad)
     lastPreviewUrl: Ref<string>
-
-    // ✅ edición (se mantiene igual que tu app actual)
     editingId: Ref<string | null>
     editingOriginal: Ref<any | null>
 }) {
@@ -56,7 +52,6 @@ export function useMediaCapture(args: {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true })
             } catch {
-                // fallback simple (sin cambiar tu lógica)
                 stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             }
 
@@ -113,7 +108,6 @@ export function useMediaCapture(args: {
             args.cleanupPreview()
             args.lastPreviewUrl.value = URL.createObjectURL(blob)
 
-            // ✅ si estoy editando: reemplaza
             if (args.editingId.value) {
                 const current = args.pending.value.find((x: any) => x.id === args.editingId.value) || args.editingOriginal.value
                 if (!current) {
@@ -138,7 +132,6 @@ export function useMediaCapture(args: {
                 return
             }
 
-            // ✅ flujo normal: crea nuevo
             const item: any = {
                 id: uuid(),
                 rut: args.rut.value,
@@ -184,7 +177,6 @@ export function useMediaCapture(args: {
             const mimeType = file.type || 'video/mp4'
             const chunksArr = await fileToChunks(file)
 
-            // ✅ si estoy editando: reemplazo
             if (args.editingId.value) {
                 const current =
                     args.pending.value.find((x: any) => x.id === args.editingId.value) ||
@@ -205,7 +197,6 @@ export function useMediaCapture(args: {
                 return
             }
 
-            // ✅ flujo normal: crea nuevo
             const item: any = {
                 id: uuid(),
                 rut: args.rut.value,

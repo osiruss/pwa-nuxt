@@ -1,7 +1,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
 
 export function useFloatingVideo(args: {
-  enabled: Ref<boolean> // termsAccepted && cameraOn
+  enabled: Ref<boolean>
 }) {
   const videoFloatEl = ref<HTMLElement | null>(null)
 

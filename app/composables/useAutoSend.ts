@@ -47,7 +47,6 @@ export function useAutoSend(args: {
     autoTimeouts.clear()
   }
 
-  // opcional: por si quieres un “init” explícito
   function init() {
     scheduleForExisting()
     startInterval()

@@ -16,19 +16,16 @@ export type GuionRowsResponse = {
   totalPages: number
 }
 
-/** =========================
- *  IndexedDB minimal KV store
- *  ========================= */
+
 const DB_NAME = "afiliacion-offline"
 const STORE_NAME = "kv"
 const CACHE_KEY = "guion:v1"
 
-// variables del guion (persisten para que no se pierdan si recargas)
 const VARS_LS_KEY = "afiliacion:guionVars:v1"
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME) // ✅ sin versión
+    const req = indexedDB.open(DB_NAME) 
 
     req.onupgradeneeded = () => {
       const db = req.result
@@ -37,8 +34,6 @@ function openDb(): Promise<IDBDatabase> {
 
     req.onsuccess = () => {
       const db = req.result
-
-      // ✅ si falta el store, forzamos upgrade version+1
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const nextVersion = (db.version || 1) + 1
         db.close()
@@ -92,9 +87,6 @@ async function idbSet<T>(key: string, value: T): Promise<void> {
   }
 }
 
-/** =========================
- *  Texto -> párrafos
- *  ========================= */
 function splitToParagraphs(raw: string): string[] {
   const clean = (raw || "").replace(/\r/g, "").trim()
   if (!clean) return []
@@ -111,13 +103,10 @@ function splitToParagraphs(raw: string): string[] {
 function applyTemplate(text: string, vars: Record<string, string>) {
   return (text || "").replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_, key) => {
     const v = vars[key]
-    return (v ?? "").trim() || `{{${key}}}` // si no está, deja el token visible
+    return (v ?? "").trim() || `{{${key}}}`
   })
 }
 
-/** =========================
- *  Composable
- *  ========================= */
 export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) => {
   const config = useRuntimeConfig()
 
@@ -135,7 +124,6 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
     hora: ""
   })
 
-  // cargar vars desde localStorage
   const loadVars = () => {
     if (!import.meta.client) return
     try {
@@ -143,18 +131,14 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === "object") vars.value = { ...vars.value, ...parsed }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   const saveVars = () => {
     if (!import.meta.client) return
     try {
       localStorage.setItem(VARS_LS_KEY, JSON.stringify(vars.value))
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   function setVar(key: string, value: string) {
@@ -173,11 +157,9 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
     saveVars()
   }
 
-  // ✅ texto final renderizado (con reemplazos)
   const renderedTitle = computed(() => applyTemplate(guion.value?.titulo ?? "", vars.value))
   const renderedText = computed(() => applyTemplate(guion.value?.texto ?? "", vars.value))
 
-  // ✅ ahora los párrafos salen del texto renderizado (ya reemplazado)
   const paragraphs = computed(() => splitToParagraphs(renderedText.value))
 
   const readCache = async () => {
@@ -206,17 +188,15 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
     error.value = null
     source.value = "none"
 
-    // OFFLINE: solo cache
     if (!isOnline()) {
       await readCache()
       pendingx.value = false
       return
     }
 
-    // ONLINE: API → cache; si falla, cache
     try {
       const res = await $fetch<GuionRowsResponse>("/tracking/guion", {
-        baseURL: "https://v9k9214s-3001.brs.devtunnels.ms" // config.public.apiBase
+        baseURL: "https://v9k9214s-3001.brs.devtunnels.ms"
       })
 
       const doc = res?.rows?.[0] ?? null
@@ -236,15 +216,10 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
   if (import.meta.client) {
     onMounted(async () => {
       loadVars()
-
-      // pinta cache rápido
       await readCache()
-
-      // si estás online (ping), pega a API
       if (isOnline()) await refresh()
     })
 
-    // cuando pase OFFLINE -> ONLINE, pega al API
     if (onlineRef && typeof onlineRef !== "boolean") {
       watch(
         () => (typeof onlineRef === "function" ? onlineRef() : (onlineRef as any).value),

@@ -4,22 +4,20 @@ export function useSyncUpload(args: {
   online: Ref<boolean>
   syncing: Ref<boolean>
 
-  // store
   pending: Ref<any[]>
   refreshPending: () => Promise<void>
   toPlainCase: (item: any, patch?: Partial<any>) => any
   isReadyExpired: (item: any) => boolean
 
-  // persistence
   idbPut: (doc: any) => Promise<any>
   idbDelete: (id: string) => Promise<any>
 
-  // ui
+
   setMsg: (t: string) => void
   shouldResetAfterSync: () => boolean
   resetToStartAfterDelay: (ms?: number) => void
 
-  // transport
+
   uploadCase: (item: any) => Promise<void>
 }) {
   async function syncOne(item: any) {
