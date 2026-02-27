@@ -216,7 +216,7 @@ export const useTerms = (onlineRef?: Ref<boolean> | (() => boolean) | boolean) =
     // ONLINE: API → cache; si falla, cache
     try {
       const res = await $fetch<GuionRowsResponse>("/tracking/guion", {
-        baseURL: "http://localhost:3001" // config.public.apiBase
+        baseURL: "https://v9k9214s-3001.brs.devtunnels.ms" // config.public.apiBase
       })
 
       const doc = res?.rows?.[0] ?? null

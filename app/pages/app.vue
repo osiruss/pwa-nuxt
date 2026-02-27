@@ -5,12 +5,8 @@
 
       <div ref="topAnchorEl" class="top-anchor"></div>
 
-      <div
-        v-show="termsAccepted && cameraOn"
-        ref="videoFloatEl"
-        class="video-float draggable-resizable"
-        :style="videoFloatStyle"
-      >
+      <div v-show="termsAccepted && cameraOn" ref="videoFloatEl" class="video-float draggable-resizable"
+        :style="videoFloatStyle">
         <video ref="videoEl" autoplay playsinline muted class="video-float__video"></video>
         <div class="video-float__drag" @pointerdown="onDragPointerDown" title="Mover"></div>
         <div class="video-float__resize" @pointerdown="onResizePointerDown" title="Redimensionar"></div>
@@ -21,75 +17,29 @@
         <small v-if="status.mode === 'verified'"> (verificado)</small>
       </p>
 
-      <!-- STEP: RUT -->
       <RutStep v-if="uiStep === 'rut'" v-model:rut="rut" :disabled="!isRutReady" @continue="goToTerms" />
 
-      <!-- STEP: TERMS + FLOW -->
       <div v-else class="stack">
-        <TermsPanel
-          v-model:rut="rut"
-          v-model:accepted="termsAccepted"
-          :renderedTitle="renderedTitle"
-          :pendingx="pendingx"
-          :paragraphs="paragraphs"
-          :error="error"
-          :source="source"
-          :online="online"
-          :syncing="syncing"
-          :showVarsForm="showVarsForm"
-          :vars="vars"
-          @toggleVarsForm="toggleVarsForm"
-          @closeVarsForm="showVarsForm = false"
-          @resetVars="resetVars"
-          @setVar="setVar"
-          @back="back"
-        />
+        <TermsPanel v-model:rut="rut" v-model:accepted="termsAccepted" :renderedTitle="renderedTitle"
+          :pendingx="pendingx" :paragraphs="paragraphs" :error="error" :source="source" :online="online"
+          :syncing="syncing" :showVarsForm="showVarsForm" :vars="vars" @toggleVarsForm="toggleVarsForm"
+          @closeVarsForm="showVarsForm = false" @resetVars="resetVars" @setVar="setVar" @back="back" />
 
         <div v-if="termsAccepted" class="stack">
-          <CameraPanel
-            v-model:selectedDeviceId="selectedDeviceId"
-            :videoInputs="videoInputs"
-            :recording="recording"
-            :cameraOn="cameraOn"
-            :syncing="syncing"
-            :online="online"
-            :pendingCount="pendingCount"
-            :readyExpiredCount="readyExpiredCount"
-            :lastPreviewUrl="lastPreviewUrl"
-            @startCamera="startCamera"
-            @stopCamera="stopCamera"
-            @openFilePicker="openFilePicker"
-            @syncPending="syncPending"
-          >
+          <CameraPanel v-model:selectedDeviceId="selectedDeviceId" :videoInputs="videoInputs" :recording="recording"
+            :cameraOn="cameraOn" :syncing="syncing" :online="online" :pendingCount="pendingCount"
+            :readyExpiredCount="readyExpiredCount" :lastPreviewUrl="lastPreviewUrl" @startCamera="startCamera"
+            @stopCamera="stopCamera" @openFilePicker="openFilePicker" @syncPending="syncPending">
             <template #fileInput>
-              <input
-                ref="fileInputEl"
-                type="file"
-                accept="video/*"
-                capture="environment"
-                class="hidden"
-                @change="onFileSelected"
-              />
+              <input ref="fileInputEl" type="file" accept="video/*" capture="environment" class="hidden"
+                @change="onFileSelected" />
             </template>
 
-            <PendingList
-              :items="sortedPending"
-              :mediaMeta="mediaMeta"
-              :syncing="syncing"
-              :online="online"
-              :formatBytes="formatBytes"
-              :formatDuration="formatDuration"
-              :formatDate="formatDate"
-              :badgeStyle="badgeStyle"
-              :remainingText="remainingText"
-              @refresh="refreshPending"
-              @edit="editPendingVideo"
-              @preview="previewPending"
-              @download="downloadPending"
-              @confirm="confirmPending"
-              @syncOne="syncOne"
-              @remove="removePending"
-            />
+            <PendingList :items="sortedPending" :mediaMeta="mediaMeta" :syncing="syncing" :online="online"
+              :formatBytes="formatBytes" :formatDuration="formatDuration" :formatDate="formatDate"
+              :badgeStyle="badgeStyle" :remainingText="remainingText" @refresh="refreshPending" @edit="editPendingVideo"
+              @preview="previewPending" @download="downloadPending" @confirm="confirmPending" @syncOne="syncOne"
+              @remove="removePending" />
 
             <div v-if="msg" class="msg">{{ msg }}</div>
           </CameraPanel>
@@ -120,14 +70,16 @@ import PendingList from '~/components/affiliacion/PendingList.vue'
 
 import { useDevices } from '~/composables/useDevices'
 import { useFloatingVideo } from '~/composables/useFloatingVideo'
-
 import { useAnchorsPreview } from '~/composables/useAnchorsPreview'
 import { usePendingCases } from '~/composables/usePendingCases'
+import { useAutoSend } from '~/composables/useAutoSend'
+import { useSyncUpload } from '~/composables/useSyncUpload'
+import { useMediaCapture } from '~/composables/useMediaCapture'
 
 const router = useRouter()
+const { override, setAuto } = useConnectivityMode()
 
-const { override, modeLabel } = useConnectivityMode()
-
+/* ------------------------ Network status ------------------------ */
 const { status, ping } = useNetworkStatus({
   pingUrl: '/api/ping-moleculer',
   verify: true,
@@ -140,18 +92,37 @@ const online = computed(() => {
   return status.value.online
 })
 
+/* ------------------------ Devices + Terms ------------------------ */
 const { videoInputs, selectedDeviceId, primePermissions, loadVideoDevices, handleSelectedDeviceChange } = useDevices()
-
 const { renderedTitle, paragraphs, vars, setVar, pendingx, error, source } = useTerms(online)
 
-
 type UiStep = 'rut' | 'terms'
+
+/* ------------------------ Core state ------------------------ */
+const rut = ref('')
+const msg = ref('')
+const syncing = ref(false)
+
+const uiStep = ref<UiStep>('rut')
+const termsAccepted = ref(false)
+const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
 
 const editingId = ref<string | null>(null)
 const editingOriginal = ref<any | null>(null)
 
-const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
+function setMsg(t: string) {
+  msg.value = t
+  console.log(t)
+}
 
+/* ------------------------ Preview + anchors ------------------------ */
+const lastPreviewUrl = ref('')
+const { topAnchorEl, previewAnchorEl, scrollToTopAnchor, scrollToPreview, cleanupPreview } = useAnchorsPreview({
+  lastPreviewUrl
+})
+
+/* ------------------------ Pending store ------------------------ */
+const AUTO_SEND_AFTER_MS = 1 * 60 * 1000
 const AUTO_CHECK_EVERY_MS = 30 * 1000
 
 const {
@@ -160,6 +131,7 @@ const {
   pendingCount,
   sortedPending,
   toPlainCase,
+  computeMetaForItem,
   refreshPending,
   replaceVideoOnItem,
   removePending: removePendingFromStore,
@@ -174,49 +146,45 @@ const {
   autoSendAfterMs: AUTO_SEND_AFTER_MS
 })
 
-
-const rut = ref('')
-const msg = ref('')
-
+/* ------------------------ DOM refs ------------------------ */
 const videoEl = ref<HTMLVideoElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 
-let stream: MediaStream | null = null
-let recorder: MediaRecorder | null = null
+/* ------------------------ Media capture (cámara/grabación/attach) ------------------------ */
+const { cameraOn, recording, startCamera, stopCamera, startRecording, stopRecording, attachFile } = useMediaCapture({
+  rut,
+  termsAccepted,
+  selectedDeviceId,
+  videoEl,
 
-const cameraOn = ref(false)
-const recording = ref(false)
-const chunks = ref<Blob[]>([])
-const lastPreviewUrl = ref('')
+  primePermissions,
+  loadVideoDevices,
 
-const { topAnchorEl, previewAnchorEl, scrollToTopAnchor, scrollToPreview, cleanupPreview } = useAnchorsPreview({
-  lastPreviewUrl
+  replaceVideoOnItem,
+  refreshPending,
+
+  setMsg,
+  scrollToTopAnchor,
+  scrollToPreview,
+  cleanupPreview,
+
+  idbPut,
+  pending,
+
+  lastPreviewUrl,
+  editingId,
+  editingOriginal
 })
 
-const syncing = ref(false)
-
-
-const uiStep = ref<UiStep>('rut')
-const termsAccepted = ref(false)
-const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
-
-
-
-/* ✅ Video flotante ahora 100% en composable */
+/* ------------------------ Floating video ------------------------ */
 const floatEnabled = computed(() => termsAccepted.value && cameraOn.value)
-
 const { videoFloatEl, videoFloatStyle, onDragPointerDown, onResizePointerDown } = useFloatingVideo({
   enabled: floatEnabled
 })
 
-/** Auto send */
-let autoTimer: ReturnType<typeof setInterval> | null = null
-const autoTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
-const { setAuto } = useConnectivityMode()
-
+/* ------------------------ UI helpers ------------------------ */
 const showVarsForm = ref(false)
 
-/* ------------------------ UI helpers ------------------------ */
 function extFromMime(mime: string) {
   const m = (mime || '').toLowerCase()
   if (m.includes('mp4')) return 'mp4'
@@ -243,13 +211,6 @@ function downloadBlob(blob: Blob, filename: string) {
   }, 1500)
 }
 
-
-async function confirmPending(item: any) {
-  const updated = await confirmToReady(item)
-  scheduleAutoSend(updated)
-  setMsg(`Confirmado: ${updated.id}. Se enviará automático en 1 minuto si no lo envías manualmente.`)
-}
-
 function downloadPending(item: any) {
   try {
     const mime = item.mimeType || 'application/octet-stream'
@@ -263,11 +224,7 @@ function downloadPending(item: any) {
   }
 }
 
-function setMsg(t: string) {
-  msg.value = t
-  console.log(t)
-}
-
+/* ------------------------ Flow / navigation ------------------------ */
 function goToTerms() {
   if (!isRutReady.value) return setMsg('Ingresa un RUT válido para continuar.')
   uiStep.value = 'terms'
@@ -282,9 +239,6 @@ function back() {
 function resetFlow() {
   termsAccepted.value = false
   uiStep.value = 'rut'
-  recording.value = false
-  chunks.value = []
-  recorder = null
   rut.value = ''
   scrollToTopAnchor()
 }
@@ -297,16 +251,10 @@ function resetToStartAfterDelay(ms = 3000) {
   }, ms)
 }
 
-
-
 function shouldResetAfterSync() {
   const remaining = pending.value.filter((x: any) => x.status === 'review' || x.status === 'ready')
   return remaining.length === 0
 }
-
-
-
-
 
 /* ------------------------ Formatting ------------------------ */
 function formatBytes(bytes: number) {
@@ -344,173 +292,11 @@ function badgeStyle(s: any) {
   return base + ' background:#f5f5f5; color:#333; border:1px solid #ddd;'
 }
 
-/* ------------------------ Media helpers ------------------------ */
-function uuid(): string {
-  return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-async function fileToChunks(file: File, chunkSize = 1024 * 1024) {
-  const out: Blob[] = []
-  let offset = 0
-  while (offset < file.size) {
-    out.push(file.slice(offset, offset + chunkSize, file.type))
-    offset += chunkSize
-  }
-  return out
-}
-
-/* ------------------------ Pending/IDB ------------------------ */
-
-/* ------------------------ Auto-send scheduling ------------------------ */
-
-
-function scheduleAutoSend(item: any) {
-  if (item.status !== 'ready') return
-  const confirmedAt = Number(item.confirmedAt || 0)
-  if (!confirmedAt) return
-
-  const prev = autoTimeouts.get(item.id)
-  if (prev) clearTimeout(prev)
-
-  const dueIn = Math.max(0, AUTO_SEND_AFTER_MS - (Date.now() - confirmedAt))
-  const t = setTimeout(async () => {
-    await syncReadyExpired()
-  }, dueIn)
-
-  autoTimeouts.set(item.id, t)
-}
-
-/* ------------------------ Camera / Recorder ------------------------ */
-async function startCamera() {
-  try {
-    if (!termsAccepted.value) return setMsg('Debes aceptar los términos antes de usar la cámara.')
-    if (!navigator.mediaDevices?.getUserMedia) return setMsg('Este navegador no soporta getUserMedia.')
-
-    if (stream) stopCamera()
-
-    await primePermissions()
-    await loadVideoDevices()
-
-    const wantDeviceId = selectedDeviceId.value?.trim()
-    const videoConstraints: MediaTrackConstraints = wantDeviceId
-      ? { deviceId: { exact: wantDeviceId } }
-      : { facingMode: { exact: 'environment' } }
-
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true })
-    } catch {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true })
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true })
-      }
-    }
-
-    if (videoEl.value) videoEl.value.srcObject = stream
-    cameraOn.value = true
-
-    const track = stream.getVideoTracks()[0]
-    const settings = track?.getSettings?.()
-    if (!wantDeviceId && settings?.deviceId) selectedDeviceId.value = String(settings.deviceId)
-
-    setMsg('Cámara activa.')
-    scrollToTopAnchor()
-  } catch (e: any) {
-    setMsg(`Error al abrir cámara: ${e?.message ?? e}`)
-  }
-}
-
-function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach((t) => t.stop())
-    stream = null
-  }
-  if (videoEl.value) videoEl.value.srcObject = null
-  cameraOn.value = false
-  setMsg('Cámara detenida.')
-}
-
-function pickMimeType(): string {
-  const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-  for (const c of candidates) {
-    if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c
-  }
-  return 'video/webm'
-}
-
-async function startRecording() {
-  if (!termsAccepted.value) return setMsg('Debes aceptar los términos antes de grabar.')
-  if (!stream) return
-  if (!rut.value) return setMsg('Debes ingresar el RUT antes de grabar.')
-
-  chunks.value = []
-  const mimeType = pickMimeType()
-
-  try {
-    recorder = new MediaRecorder(stream, { mimeType })
-  } catch {
-    recorder = new MediaRecorder(stream)
-  }
-
-  recorder.ondataavailable = (ev: BlobEvent) => {
-    if (ev.data && ev.data.size > 0) chunks.value.push(ev.data)
-  }
-
-  recorder.onstop = async () => {
-    recording.value = false
-
-    const blob = new Blob(chunks.value, { type: recorder?.mimeType || 'video/webm' })
-    cleanupPreview()
-    lastPreviewUrl.value = URL.createObjectURL(blob)
-
-    if (editingId.value) {
-      const current = pending.value.find((x: any) => x.id === editingId.value) || editingOriginal.value
-      if (!current) {
-        editingId.value = null
-        editingOriginal.value = null
-        stopCamera()
-        return setMsg('No encontré el pendiente a editar.')
-      }
-
-      await replaceVideoOnItem(current, {
-        chunks: [...chunks.value],
-        mimeType: recorder?.mimeType || 'video/webm',
-        keepConfirmedAt: false
-      })
-
-      editingId.value = null
-      editingOriginal.value = null
-
-      setMsg('Video actualizado. Revisa y CONFIRMA nuevamente para habilitar envío.')
-      stopCamera()
-      scrollToPreview()
-      return
-    }
-
-    const item: any = {
-      id: uuid(),
-      rut: rut.value,
-      createdAt: Date.now(),
-      status: 'review',
-      confirmedAt: null,
-      mimeType: recorder?.mimeType || 'video/webm',
-      chunks: [...chunks.value]
-    }
-
-    await idbPut(item as any)
-    await refreshPending()
-    setMsg('Grabación guardada. Revisa y CONFIRMA para dejar listo para envío.')
-    stopCamera()
-    scrollToPreview()
-  }
-
-  recorder.start(1000)
-  recording.value = true
-  setMsg('Grabando...')
-}
-
-function stopRecording() {
-  if (recorder && recording.value) recorder.stop()
+/* ------------------------ Pending actions ------------------------ */
+async function confirmPending(item: any) {
+  const updated = await confirmToReady(item)
+  scheduleAutoSend(updated)
+  setMsg(`Confirmado: ${updated.id}. Se enviará automático en 1 minuto si no lo envías manualmente.`)
 }
 
 async function removePending(id: string) {
@@ -529,59 +315,10 @@ async function onFileSelected(ev: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (!rut.value) return setMsg('Debes ingresar el RUT antes de adjuntar un video.')
-
-  try {
-    setMsg(`Adjuntando video: ${file.name} (${formatBytes(file.size)})...`)
-
-    const mimeType = file.type || 'video/mp4'
-    const chunksArr = await fileToChunks(file)
-
-    if (editingId.value) {
-      const current = pending.value.find((x: any) => x.id === editingId.value) || editingOriginal.value
-      if (!current) {
-        editingId.value = null
-        editingOriginal.value = null
-        return setMsg('No encontré el pendiente a editar.')
-      }
-
-      await replaceVideoOnItem(current, {
-        chunks: chunksArr,
-        mimeType,
-        keepConfirmedAt: false
-      })
-
-      editingId.value = null
-      editingOriginal.value = null
-
-      setMsg('Video adjuntado y actualizado. Revisa y CONFIRMA nuevamente.')
-      return
-    }
-
-    const item: any = {
-      id: uuid(),
-      rut: rut.value,
-      createdAt: Date.now(),
-      status: 'review',
-      confirmedAt: null,
-      mimeType,
-      chunks: chunksArr
-    }
-
-    await idbPut(item as any)
-    await refreshPending()
-
-    computeMetaForItem(item)
-      .then((meta) => (mediaMeta.value = { ...mediaMeta.value, [item.id]: meta }))
-      .catch(() => (mediaMeta.value = { ...mediaMeta.value, [item.id]: { sizeBytes: file.size, durationSec: null } }))
-
-    setMsg('Video adjuntado y guardado OFFLINE. Revisa y CONFIRMA para dejar listo para envío.')
-  } catch (e: any) {
-    setMsg(`Error adjuntando video: ${e?.message ?? e}`)
-  }
+  await attachFile(file)
 }
 
-/* ------------------------ Preview + confirm ------------------------ */
+/* ------------------------ Preview + edit ------------------------ */
 function previewPending(item: StoredCase) {
   const blob = new Blob((item as any).chunks, { type: (item as any).mimeType })
   cleanupPreview()
@@ -597,7 +334,7 @@ async function editPendingVideo(item: any) {
 
   if (item.status === 'ready') {
     const updated = toPlainCase(item, { status: 'review', confirmedAt: null })
-    await idbPut(updated as any)
+    await idbPut(updated)
     await refreshPending()
   }
 
@@ -605,12 +342,11 @@ async function editPendingVideo(item: any) {
   editingOriginal.value = toPlainCase(item)
 
   previewPending(item)
-
   await startCamera()
   setMsg(`Editando video del caso: ${item.id}`)
 }
 
-/* ------------------------ Upload / sync ------------------------ */
+/* ------------------------ Upload (queda en app) ------------------------ */
 async function uploadCase(item: any) {
   const blob = new Blob(item.chunks, { type: item.mimeType })
 
@@ -635,101 +371,48 @@ async function uploadCase(item: any) {
   }
 }
 
-async function syncOne(item: any) {
-  if (!online.value) return setMsg('OFFLINE (ping). No se puede subir.')
-  if (item.status !== 'ready') return setMsg('Debes CONFIRMAR el video antes de subir.')
-  if (syncing.value) return
+/* ------------------------ Sync composable ------------------------ */
+const { syncOne, syncPending, syncReadyExpired } = useSyncUpload({
+  online,
+  syncing,
 
-  syncing.value = true
-  try {
-    setMsg(`Subiendo caso ${item.id} (RUT ${item.rut})...`)
-    await uploadCase(item)
-    await idbDelete(item.id)
-    await refreshPending()
-    setMsg(`Subido OK y eliminado local: ${item.id}`)
-    if (shouldResetAfterSync()) resetToStartAfterDelay()
-  } catch (e: any) {
-    await idbPut(toPlainCase(item, { status: 'error' }) as any)
-    await refreshPending()
-    setMsg(`Error subiendo ${item.id}: ${e?.message ?? e}`)
-  } finally {
-    syncing.value = false
-  }
-}
+  pending,
+  refreshPending,
+  toPlainCase,
+  isReadyExpired,
 
-async function syncPending() {
-  if (!online.value) return setMsg('OFFLINE (ping). No se puede sincronizar.')
-  if (syncing.value) return
+  idbPut,
+  idbDelete,
 
-  syncing.value = true
-  try {
-    await refreshPending()
-    const ready = pending.value.filter((x: any) => x.status === 'ready')
-    if (ready.length === 0) return setMsg('No hay confirmados listos para enviar.')
+  setMsg,
+  shouldResetAfterSync,
+  resetToStartAfterDelay,
 
-    for (const item of [...ready]) {
-      try {
-        setMsg(`Subiendo confirmado ${item.id}...`)
-        await uploadCase(item)
-        await idbDelete(item.id)
-      } catch (e: any) {
-        await idbPut(toPlainCase(item, { status: 'error' }) as any)
-        setMsg(`Error subiendo ${item.id}: ${e?.message ?? e}`)
-      }
-    }
+  uploadCase
+})
 
-    await refreshPending()
-    setMsg('Envío manual terminado.')
-    if (shouldResetAfterSync()) resetToStartAfterDelay()
-  } finally {
-    syncing.value = false
-  }
-}
+/* ------------------------ Auto-send composable ------------------------ */
+const { scheduleAutoSend, init: initAutoSend, stop: stopAutoSend } = useAutoSend({
+  pending,
+  autoSendAfterMs: AUTO_SEND_AFTER_MS,
+  autoCheckEveryMs: AUTO_CHECK_EVERY_MS,
+  syncReadyExpired
+})
 
-async function syncReadyExpired() {
-  if (!online.value) return
-  if (syncing.value) return
-
-  await refreshPending()
-  const expired = pending.value.filter((x: any) => isReadyExpired(x))
-  if (expired.length === 0) return
-
-  syncing.value = true
-  try {
-    for (const item of [...expired]) {
-      try {
-        setMsg(`(Auto) Subiendo confirmado ${item.id}...`)
-        await uploadCase(item)
-        await idbDelete(item.id)
-      } catch (e: any) {
-        await idbPut(toPlainCase(item, { status: 'error' }) as any)
-        setMsg(`(Auto) Error subiendo ${item.id}: ${e?.message ?? e}`)
-      }
-    }
-    await refreshPending()
-    setMsg('(Auto) Envío automático terminado.')
-  } finally {
-    syncing.value = false
-  }
-}
-
-
+/* ------------------------ Vars form ------------------------ */
 function toggleVarsForm() {
   showVarsForm.value = !showVarsForm.value
 }
 
-/* ------------------------ Router ------------------------ */
 function goHome() {
   setAuto()
   router.push('/')
 }
 
-/* ------------------------ Limpia formulario ingreso de datos guión ------------------------ */
 function resetVars() {
   Object.keys(vars.value).forEach((k) => {
     ;(vars.value as any)[k] = ''
   })
-
   if (import.meta.client) {
     try {
       localStorage.removeItem('afiliacion:guionVars:v1')
@@ -788,20 +471,13 @@ onMounted(async () => {
   await primePermissions()
   await loadVideoDevices()
 
-  for (const item of pending.value as any[]) scheduleAutoSend(item)
-
-  autoTimer = setInterval(() => {
-    syncReadyExpired()
-  }, AUTO_CHECK_EVERY_MS)
+  initAutoSend()
 })
 
 onBeforeUnmount(() => {
   stopCamera()
   cleanupPreview()
-
-  if (autoTimer) clearInterval(autoTimer)
-  for (const t of autoTimeouts.values()) clearTimeout(t)
-  autoTimeouts.clear()
+  stopAutoSend()
 })
 </script>
 

@@ -1,4 +1,5 @@
 <template>
+  <NuxtPwaManifest />
   <ClientOnly>
     <UApp>
       <NuxtPage />
@@ -17,7 +18,6 @@ import { idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
 const pendingOpen = ref(false)
 const syncing = ref(false)
 
-
 function handlePendingChanged() {
   if (process.client) {
     window.dispatchEvent(new Event('cases:changed'))
@@ -32,31 +32,19 @@ async function uploadCase(item: StoredCase) {
   fd.append('createdAt', String(item.createdAt))
   fd.append('video', blob, `${item.rut}-${item.createdAt}.webm`)
 
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    body: fd
-  })
-
-  if (!res.ok) {
-    throw new Error(`Upload falló: ${res.status}`)
-  }
+  const res = await fetch('/api/upload', { method: 'POST', body: fd })
+  if (!res.ok) throw new Error(`Upload falló: ${res.status}`)
 }
 
-/**
- * Sincroniza todos los pendientes
- */
 async function syncPending() {
   if (!process.client) return
   if (!navigator.onLine) return
   if (syncing.value) return
 
   syncing.value = true
-
   try {
     const all = await idbGetAll()
-    const pend = all.filter(
-      x => x.status === 'pending' || x.status === 'error'
-    )
+    const pend = all.filter(x => x.status === 'pending' || x.status === 'error')
 
     for (const item of pend) {
       await uploadCase(item)

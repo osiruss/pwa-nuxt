@@ -1,12 +1,24 @@
 export default defineNuxtConfig({
-  modules: ['@vite-pwa/nuxt', '@nuxt/ui'],
   ssr: false,
+  modules: ['@vite-pwa/nuxt', '@nuxt/ui'],
+
+  app: {
+    head: {
+      meta: [{ name: 'theme-color', content: '#0b5fff' }],
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/pwa-192x192.png' },
+        { rel: 'apple-touch-icon', href: '/pwa-192x192.png' }
+      ]
+    }
+  },
+
   pwa: {
-    devOptions: { enabled: false },
     registerType: 'autoUpdate',
     manifest: {
       name: 'POC Afiliación Offline',
       short_name: 'Afiliación',
+      start_url: '/',
+      scope: '/',
       display: 'standalone',
       background_color: '#ffffff',
       theme_color: '#0b5fff',
@@ -15,23 +27,12 @@ export default defineNuxtConfig({
         { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' }
       ]
     },
-    workbox: {
-      navigateFallback: '/',
-      runtimeCaching: []
+    devOptions: {
+      enabled: true
     }
   },
 
   runtimeConfig: {
-    public: {
-      apiBase: ''
-    }
-  },
-  
-  vite: {
-    server: {
-      //allowedHosts: ['uncriticisably-vitiable-yvone.ngrok-free.dev'],
-      host: true,
-      port: 3000
-    }
-  },
+    public: { apiBase: '' }
+  }
 })
