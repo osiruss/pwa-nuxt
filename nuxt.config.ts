@@ -70,10 +70,10 @@ export default defineNuxtConfig({
     },
 
     workbox: {
-      navigateFallback: '/',
+      navigateFallback: '/index.html',
       navigateFallbackDenylist: [/^\/api\//],
-      globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,woff2}'],
-
+      globPatterns: ['**/*.{html,js,css,ico,png,svg,webmanifest,woff2}'],
+      globIgnores: ['**/sw.js', '**/workbox-*.js'],
       runtimeCaching: [
         {
           urlPattern: ({ request }) => request.mode === 'navigate',
