@@ -439,7 +439,7 @@ async function uploadCase(item: any) {
 
   fd.append('video', blob, `${item.rut}-${item.createdAt}.${ext}`)
 
-  const res = await fetch('/api/upload', { method: 'POST', body: fd })
+  const res = await fetch('https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/upload', { method: 'POST', body: fd })
   if (!res.ok) {
     const txt = await res.text().catch(() => '')
     throw new Error(`Upload falló: ${res.status} ${txt}`)
