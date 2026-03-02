@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
-  const target = 'https://pwa-nuxt-fuerza-upload.vercel.app' //`${config.public.apiBase}/tracking/sitpriv/upload`; //'http://localhost:3001/tracking/sitpriv/upload'
+  const target = 'https://v9k9214s-3001.brs.devtunnels.ms' //`${config.public.apiBase}/tracking/sitpriv/upload`; //'http://localhost:3001/tracking/sitpriv/upload'
   
 
   const ct = getHeader(event, 'content-type') || ''
