@@ -26,7 +26,68 @@
           @closeVarsForm="showVarsForm = false" @resetVars="resetVars" @setVar="setVar" @back="back" />
 
         <div v-if="termsAccepted" class="stack">
-          <CameraPanel v-model:selectedDeviceId="selectedDeviceId" :videoInputs="videoInputs" :recording="recording"
+          <CameraPanel
+            v-model:selectedDeviceId="selectedDeviceId"
+            :videoInputs="videoInputs"
+            :recording="recording"
+            :cameraOn="cameraOn"
+            :syncing="syncing"
+            :online="online"
+            :pendingCount="pendingCount"
+            :readyExpiredCount="readyExpiredCount"
+            :lastPreviewUrl="lastPreviewUrl"
+            :showRecordPicker="isMobile"
+            @startCamera="startCamera"
+            @stopCamera="stopCamera"
+            @openFilePicker="openFilePicker"
+            @openCameraPicker="openCameraPicker"
+            @syncPending="syncPending"
+          >
+            <!-- 📎 Adjuntar: SIN capture => NO abre cámara -->
+            <template #fileInput>
+              <input
+                ref="fileInputEl"
+                type="file"
+                accept="video/*"
+                class="hidden"
+                @change="onFileSelected"
+              />
+            </template>
+
+            <!-- 🎥 Grabar: CON capture => abre cámara trasera -->
+            <template #cameraInput>
+              <input
+                ref="cameraInputEl"
+                type="file"
+                accept="video/*"
+                capture="environment"
+                class="hidden"
+                @change="onFileSelected"
+              />
+            </template>
+
+            <PendingList
+              :items="sortedPending"
+              :mediaMeta="mediaMeta"
+              :syncing="syncing"
+              :online="online"
+              :formatBytes="formatBytes"
+              :formatDuration="formatDuration"
+              :formatDate="formatDate"
+              :badgeStyle="badgeStyle"
+              :remainingText="remainingText"
+              @refresh="refreshPending"
+              @edit="editPendingVideo"
+              @preview="previewPending"
+              @download="downloadPending"
+              @confirm="confirmPending"
+              @syncOne="syncOne"
+              @remove="removePending"
+            />
+
+            <div v-if="msg" class="msg">{{ msg }}</div>
+          </CameraPanel>
+          <!-- <CameraPanel v-model:selectedDeviceId="selectedDeviceId" :videoInputs="videoInputs" :recording="recording"
             :cameraOn="cameraOn" :syncing="syncing" :online="online" :pendingCount="pendingCount"
             :readyExpiredCount="readyExpiredCount" :lastPreviewUrl="lastPreviewUrl" @startCamera="startCamera"
             @stopCamera="stopCamera" @openFilePicker="openFilePicker" @syncPending="syncPending">
@@ -42,7 +103,7 @@
               @remove="removePending" />
 
             <div v-if="msg" class="msg">{{ msg }}</div>
-          </CameraPanel>
+          </CameraPanel> -->
         </div>
 
         <div v-else class="empty">
@@ -149,6 +210,7 @@ const {
 /* ------------------------ DOM refs ------------------------ */
 const videoEl = ref<HTMLVideoElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const cameraInputEl = ref<HTMLInputElement | null>(null)
 
 /* ------------------------ Media capture (cámara/grabación/attach) ------------------------ */
 const { cameraOn, recording, startCamera, stopCamera, startRecording, stopRecording, attachFile } = useMediaCapture({
@@ -175,6 +237,8 @@ const { cameraOn, recording, startCamera, stopCamera, startRecording, stopRecord
   editingId,
   editingOriginal
 })
+
+const isMobile = computed(() => import.meta.client && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
 
 /* ------------------------ Floating video ------------------------ */
 const floatEnabled = computed(() => termsAccepted.value && cameraOn.value)
@@ -307,7 +371,18 @@ async function removePending(id: string) {
 /* ------------------------ File attach ------------------------ */
 function openFilePicker() {
   if (!rut.value) return setMsg('Debes ingresar el RUT antes de adjuntar un video.')
-  fileInputEl.value?.click()
+  const el = fileInputEl.value
+  if (!el) return
+  el.value = ''
+  el.click()
+}
+
+function openCameraPicker() {
+  if (!rut.value) return setMsg('Debes ingresar el RUT antes de grabar un video.')
+  const el = cameraInputEl.value
+  if (!el) return
+  el.value = ''
+  el.click()
 }
 
 async function onFileSelected(ev: Event) {
