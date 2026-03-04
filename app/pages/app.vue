@@ -37,7 +37,7 @@
             :readyExpiredCount="readyExpiredCount"
             :lastPreviewUrl="lastPreviewUrl"
             :showRecordPicker="isMobile"
-            @startCamera="startCamera"
+            @startCamera="startCameraWithGuion"
             @stopCamera="stopCamera"
             @openFilePicker="openFilePicker"
             @openCameraPicker="openCameraPicker"
@@ -136,11 +136,11 @@ import { usePendingCases } from '~/composables/usePendingCases'
 import { useAutoSend } from '~/composables/useAutoSend'
 import { useSyncUpload } from '~/composables/useSyncUpload'
 import { useMediaCapture } from '~/composables/useMediaCapture'
+import { formatRut, isValidRut } from '~/utils/rut'
 
 const router = useRouter()
 const { override, setAuto } = useConnectivityMode()
 
-/* ------------------------ Network status ------------------------ */
 const { status, ping } = useNetworkStatus({
   pingUrl: '/api/ping-moleculer',
   verify: true,
@@ -153,9 +153,25 @@ const online = computed(() => {
   return status.value.online
 })
 
-/* ------------------------ Devices + Terms ------------------------ */
-const { videoInputs, selectedDeviceId, primePermissions, loadVideoDevices, handleSelectedDeviceChange } = useDevices()
-const { renderedTitle, paragraphs, vars, setVar, pendingx, error, source } = useTerms(online)
+// const isRutReady = computed(() => isValidRut(rut.value))
+
+const { 
+  videoInputs, 
+  selectedDeviceId, 
+  primePermissions, 
+  loadVideoDevices, 
+  handleSelectedDeviceChange 
+} = useDevices()
+const { 
+  renderedTitle, 
+  paragraphs, 
+  vars, 
+  setVar, 
+  pendingx, 
+  error, 
+  source,
+  refresh
+} = useTerms(online)
 
 type UiStep = 'rut' | 'terms'
 
@@ -166,7 +182,7 @@ const syncing = ref(false)
 
 const uiStep = ref<UiStep>('rut')
 const termsAccepted = ref(false)
-const isRutReady = computed(() => (rut.value || '').trim().length >= 8)
+const isRutReady = computed(() => isValidRut(rut.value))
 
 const editingId = ref<string | null>(null)
 const editingOriginal = ref<any | null>(null)
@@ -290,7 +306,7 @@ function downloadPending(item: any) {
 
 /* ------------------------ Flow / navigation ------------------------ */
 function goToTerms() {
-  if (!isRutReady.value) return setMsg('Ingresa un RUT válido para continuar.')
+  if (!isRutReady.value) return setMsg('Ingresa un RUT válido (con dígito verificador).')
   uiStep.value = 'terms'
 }
 
@@ -440,6 +456,8 @@ async function uploadCase(item: any) {
   fd.append('video', blob, `${item.rut}-${item.createdAt}.${ext}`)
 
   const res = await fetch('https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/upload', { method: 'POST', body: fd })
+  console.log("🚀 ~ uploadCase ~ res:", res)
+  
   if (!res.ok) {
     const txt = await res.text().catch(() => '')
     throw new Error(`Upload falló: ${res.status} ${txt}`)
@@ -495,6 +513,18 @@ function resetVars() {
   }
 }
 
+/* ------------------------ Enciende camara ------------------------ */
+
+async function startCameraWithGuion() {
+  try {
+    await refresh()
+  } catch (e) {
+    console.warn('[terms.refresh] falló:', e)
+  }
+
+  await startCamera()
+}
+
 /* ------------------------ Watches ------------------------ */
 watch(
   () => termsAccepted.value,
@@ -502,11 +532,12 @@ watch(
     if (!accepted) return
     if (!isRutReady.value) {
       termsAccepted.value = false
-      return setMsg('Ingresa un RUT válido para continuar.')
+      return setMsg('Ingresa un RUT válido (con dígito verificador) para continuar.')
     }
     setMsg('Términos aceptados. Puedes encender cámara o adjuntar un video.')
     await primePermissions()
     await loadVideoDevices()
+
   }
 )
 
@@ -532,6 +563,15 @@ watch(
       setMsg,
       revert: (v) => (selectedDeviceId.value = v)
     })
+    await refresh();
+  }
+)
+
+watch(
+  () => rut.value,
+  (v) => {
+    const formatted = formatRut(v)
+    if (formatted !== v) rut.value = formatted
   }
 )
 

@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
-  const url = `${config.public.apiBase}/tracking/sitpriv/ping` //'http://localhost:3001/tracking/sitpriv/ping'
+  const url = `${config.public.apiBase}/tracking/sitpriv/ping`
 
   try {
     const res = await fetch(url, { method: 'GET' })
