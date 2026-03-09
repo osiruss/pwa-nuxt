@@ -5,7 +5,7 @@
       <LoginStep v-if="uiStep === 'login'" :rut="rut" :pass="pass" :loading="loginLoading" :error="loginError"
         @update:rut="rut = $event" @update:pass="pass = $event" @submit="onLoginSubmit" @forgot="onForgot" />
 
-      <WelcomeView v-else-if="uiStep === 'welcome'" @enter="uiStep = 'rut'" />
+      <WelcomeView v-else-if="uiStep === 'welcome'" @enter="uiStep = 'pre'" />
 
       <PreAffiliationView v-else-if="uiStep === 'pre'" @continue="onPreContinue" @cancel="uiStep = 'welcome'" />
 

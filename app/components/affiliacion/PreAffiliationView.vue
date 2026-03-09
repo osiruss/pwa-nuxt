@@ -62,7 +62,6 @@ function onContinue() {
       <button class="lh-btnSecondary" type="button" @click="emit('cancel')">
         Cancelar pre-afiliación
       </button>
-      <!-- <div class="lh-bottomSpacer"></div> -->
     </main>
   </div>
 </template>

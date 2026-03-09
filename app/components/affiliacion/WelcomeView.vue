@@ -45,27 +45,8 @@ const executiveEmail = 'c.vera@losheroes.cl'
       </UiButton>
     </section>
 
-    <!-- si mantienes el bottom nav global en app.vue, puedes quitar esto -->
-    <!-- <nav class="lh-bottomBar">
-      <div class="lh-bottomBar__inner">
-        <button class="lh-tab lh-tab--active" type="button">
-          <span class="lh-tab__pill">
-            <UiIcon name="home" :size="22" />
-          </span>
-          <span class="lh-tab__text">Inicio</span>
-        </button>
-
-        <button class="lh-tab" type="button" @click="menuOpen = true">
-          <span class="lh-tab__pill lh-tab__pill--plain">
-            <UiIcon name="menu" :size="22" />
-          </span>
-          <span class="lh-tab__text">Menú</span>
-        </button>
-      </div>
-    </nav> -->
   </div>
 </template>
 
 <style scoped>
-/* welcome ya no necesita CSS (solo deja aquí excepciones puntuales si aparecen) */
 </style>
