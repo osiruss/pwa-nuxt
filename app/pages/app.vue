@@ -1,100 +1,55 @@
 <template>
-  <main class="page">
+  <main class="page" :class="{ 'page--full': uiStep === 'welcome' }">
     <section class="card">
-      <button class="btn-home" type="button" @click="goHome" title="Volver al selector">x</button>
-
       <div ref="topAnchorEl" class="top-anchor"></div>
+      <LoginStep v-if="uiStep === 'login'" :rut="rut" :pass="pass" :loading="loginLoading" :error="loginError"
+        @update:rut="rut = $event" @update:pass="pass = $event" @submit="onLoginSubmit" @forgot="onForgot" />
 
-      <div v-show="termsAccepted && cameraOn" ref="videoFloatEl" class="video-float draggable-resizable"
-        :style="videoFloatStyle">
-        <video ref="videoEl" autoplay playsinline muted class="video-float__video"></video>
-        <div class="video-float__drag" @pointerdown="onDragPointerDown" title="Mover"></div>
-        <div class="video-float__resize" @pointerdown="onResizePointerDown" title="Redimensionar"></div>
-      </div>
+      <WelcomeView v-else-if="uiStep === 'welcome'" @enter="uiStep = 'rut'" />
 
-      <p class="status">
-        Estado conexión: <b>{{ online ? 'ONLINE' : 'OFFLINE' }}</b>
-        <small v-if="status.mode === 'verified'"> (verificado)</small>
-      </p>
+      <PreAffiliationView v-else-if="uiStep === 'pre'" @continue="onPreContinue" @cancel="uiStep = 'welcome'" />
 
-      <RutStep v-if="uiStep === 'rut'" v-model:rut="rut" :disabled="!isRutReady" @continue="goToTerms" />
+      <PreAffiliationStep2View v-else-if="uiStep === 'pre2'" @consult="onConsultAffiliation" @back="uiStep = 'pre'"
+        @cancel="uiStep = 'welcome'" />
 
-      <div v-else class="stack">
-        <TermsPanel v-model:rut="rut" v-model:accepted="termsAccepted" :renderedTitle="renderedTitle"
-          :pendingx="pendingx" :paragraphs="paragraphs" :error="error" :source="source" :online="online"
-          :syncing="syncing" :showVarsForm="showVarsForm" :vars="vars" @toggleVarsForm="toggleVarsForm"
-          @closeVarsForm="showVarsForm = false" @resetVars="resetVars" @setVar="setVar" @back="back" />
+      <PreAffiliationConsultResultView v-else-if="uiStep === 'resultView'" :rut="consultResult.rut"
+        :prospect-name="consultResult.prospectName" :benefit-start-date="consultResult.benefitStartDate"
+        :compensation-box="consultResult.compensationBox" :status="consultResult.status" @continue="goFromResultToPre3"
+        @back="goBackStep" @cancel="cancelPreAffiliation" />
 
-        <div v-if="termsAccepted" class="stack">
-          <CameraPanel
-            v-model:selectedDeviceId="selectedDeviceId"
-            :videoInputs="videoInputs"
-            :recording="recording"
-            :cameraOn="cameraOn"
-            :syncing="syncing"
-            :online="online"
-            :pendingCount="pendingCount"
-            :readyExpiredCount="readyExpiredCount"
-            :lastPreviewUrl="lastPreviewUrl"
-            :showRecordPicker="isMobile"
-            @startCamera="startCameraWithGuion"
-            @stopCamera="stopCamera"
-            @openFilePicker="openFilePicker"
-            @openCameraPicker="openCameraPicker"
-            @syncPending="syncPending"
-          >
-            <!-- 📎 Adjuntar: SIN capture => NO abre cámara -->
-            <template #fileInput>
-              <input
-                ref="fileInputEl"
-                type="file"
-                accept="video/*"
-                class="hidden"
-                @change="onFileSelected"
-              />
-            </template>
+      <PreAffiliationStep3View v-else-if="uiStep === 'pre3'" @startBiometric="onStartBiometric" @back="goBackFromPre3"
+        @cancel="cancelPreAffiliation" />
 
-            <!-- 🎥 Grabar: CON capture => abre cámara trasera -->
-            <template #cameraInput>
-              <input
-                ref="cameraInputEl"
-                type="file"
-                accept="video/*"
-                capture="environment"
-                class="hidden"
-                @change="onFileSelected"
-              />
-            </template>
+      <PreAffiliationBiometricSuccessView v-else-if="uiStep === 'pre4'" @continue="goFromPre4ToNext" />
 
-            <PendingList
-              :items="sortedPending"
-              :mediaMeta="mediaMeta"
-              :syncing="syncing"
-              :online="online"
-              :formatBytes="formatBytes"
-              :formatDuration="formatDuration"
-              :formatDate="formatDate"
-              :badgeStyle="badgeStyle"
-              :remainingText="remainingText"
-              @refresh="refreshPending"
-              @edit="editPendingVideo"
-              @preview="previewPending"
-              @download="downloadPending"
-              @confirm="confirmPending"
-              @syncOne="syncOne"
-              @remove="removePending"
-            />
+      <PreAffiliationSubmittedView v-else-if="uiStep === 'pre5'" :event-id="submittedResult.eventId"
+        :status-text="submittedResult.statusText" :submitted-at="submittedResult.submittedAt"
+        :client-rut="submittedResult.clientRut" :client-name="submittedResult.clientName"
+        :compensation-box="submittedResult.compensationBox" :executive-name="submittedResult.executiveName"
+        :executive-rut="submittedResult.executiveRut" :executive-email="submittedResult.executiveEmail"
+        :branch-code="submittedResult.branchCode" @goHome="goToHomeFromSubmitted" />
+        
+      <template v-else>
+        <RutStep v-if="uiStep === 'rut'" v-model:rut="rut" :disabled="!isRutReady" @continue="goToTerms" />
+        <PreAffiliationRecordingView v-else>
+          <div class="stack">
+            <TermsPanel v-model:rut="rut" :renderedTitle="renderedTitle" :pendingx="pendingx" :paragraphs="paragraphs"
+              :error="error" :source="source" :online="online" :syncing="syncing" :showVarsForm="showVarsForm"
+              :vars="vars" :lastPreviewUrl="lastPreviewUrl" :showRecordPicker="isMobile" :cameraOn="cameraOn"
+              :recording="recording" :recordedDurationSec="recordedDurationSec"
+              :hasRecordedPreview="!!lastPreviewUrl && !cameraOn" @toggleVarsForm="toggleVarsForm"
+              @closeVarsForm="showVarsForm = false" @resetVars="resetVars" @setVar="setVar" @back="back"
+              @startCamera="startCameraWithGuion" @stopCamera="onStopCameraWithReset" @startRecording="onStartRecording"
+              @stopRecording="onStopRecording" @openCameraPicker="openCameraPicker" @openFilePicker="openFilePicker">
+              <template #livePreview>
+                <video ref="videoEl" autoplay playsinline muted class="lh-previewMini__live"></video>
+              </template>
+            </TermsPanel>
 
-            <div v-if="msg" class="msg">{{ msg }}</div>
-          </CameraPanel>
-          <!-- <CameraPanel v-model:selectedDeviceId="selectedDeviceId" :videoInputs="videoInputs" :recording="recording"
-            :cameraOn="cameraOn" :syncing="syncing" :online="online" :pendingCount="pendingCount"
-            :readyExpiredCount="readyExpiredCount" :lastPreviewUrl="lastPreviewUrl" @startCamera="startCamera"
-            @stopCamera="stopCamera" @openFilePicker="openFilePicker" @syncPending="syncPending">
-            <template #fileInput>
-              <input ref="fileInputEl" type="file" accept="video/*" capture="environment" class="hidden"
-                @change="onFileSelected" />
-            </template>
+            <input ref="fileInputEl" type="file" accept="video/*" class="hidden" @change="onFileSelected" />
+
+            <input ref="cameraInputEl" type="file" accept="video/*" capture="environment" class="hidden"
+              @change="onFileSelected" />
 
             <PendingList :items="sortedPending" :mediaMeta="mediaMeta" :syncing="syncing" :online="online"
               :formatBytes="formatBytes" :formatDuration="formatDuration" :formatDate="formatDate"
@@ -103,40 +58,78 @@
               @remove="removePending" />
 
             <div v-if="msg" class="msg">{{ msg }}</div>
-          </CameraPanel> -->
-        </div>
-
-        <div v-else class="empty">
-          Acepta los términos para habilitar cámara, grabación, adjuntar y envío.
-        </div>
-      </div>
+          </div>
+        </PreAffiliationRecordingView>
+      </template>
     </section>
 
-    <div v-if="termsAccepted && cameraOn" class="bottom-controls">
-      <button class="btn-ghost" @click="stopCamera" :disabled="!cameraOn">⛔</button>
-      <button class="btn-record" v-if="!recording" @click="startRecording" :disabled="!cameraOn">●</button>
-      <button class="btn-stop" v-else @click="stopRecording">■</button>
-    </div>
+    <nav v-if="uiStep !== 'login'" class="appBottom">
+      <div class="appBottom__inner">
+        <button class="appBottom__tab" :class="{ 'appBottom__tab--active': uiStep === 'welcome' }" type="button"
+          @click="uiStep = 'welcome'">
+          <span class="appBottom__pill" :class="{ 'appBottom__pill--plain': uiStep !== 'welcome' }">
+            <UiIcon name="home" :size="22" />
+          </span>
+          <span class="appBottom__text">Inicio</span>
+        </button>
+
+        <button class="appBottom__tab" type="button" @click="menuOpen = true">
+          <span class="appBottom__pill appBottom__pill--plain">
+            <UiIcon name="menu" :size="22" />
+          </span>
+          <span class="appBottom__text appBottom__text--blue">Menú</span>
+        </button>
+      </div>
+    </nav>
+
+    <AppMenuDrawer v-model="menuOpen" :items="menuItems" :active-key="uiStep === 'welcome'
+      ? 'home'
+      : ['pre', 'pre2', 'resultView', 'pre3', 'pre4', 'pre5'].includes(uiStep)
+        ? 'pre'
+        : undefined
+      " @select="onMenuSelect" @logout="onMenuLogout" />
+
   </main>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { idbPut, idbGetAll, idbDelete, type StoredCase } from '~/utils/idb'
-
 import RutStep from '~/components/affiliacion/RutStep.vue'
 import TermsPanel from '~/components/affiliacion/TermsPanel.vue'
-import CameraPanel from '~/components/affiliacion/CameraPanel.vue'
 import PendingList from '~/components/affiliacion/PendingList.vue'
-
 import { useDevices } from '~/composables/useDevices'
-import { useFloatingVideo } from '~/composables/useFloatingVideo'
 import { useAnchorsPreview } from '~/composables/useAnchorsPreview'
 import { usePendingCases } from '~/composables/usePendingCases'
 import { useAutoSend } from '~/composables/useAutoSend'
 import { useSyncUpload } from '~/composables/useSyncUpload'
 import { useMediaCapture } from '~/composables/useMediaCapture'
 import { formatRut, isValidRut } from '~/utils/rut'
+import LoginStep from '~/components/affiliacion/LoginStep.vue'
+import WelcomeView from '~/components/affiliacion/WelcomeView.vue'
+import AppMenuDrawer, { type AppMenuItem } from '~/components/ui/AppMenuDrawer.vue'
+import PreAffiliationView from '~/components/affiliacion/PreAffiliationView.vue'
+import PreAffiliationStep2View from '~/components/affiliacion/PreAffiliationStep2View.vue'
+import PreAffiliationStep3View from '~/components/affiliacion/PreAffiliationStep3View.vue'
+import PreAffiliationConsultResultView from '~/components/affiliacion/PreAffiliationConsultResultView.vue'
+import PreAffiliationBiometricSuccessView from '~/components/affiliacion/PreAffiliationBiometricSuccessView.vue'
+
+import PreAffiliationRecordingView from '~/components/affiliacion/PreAffiliationRecordingView.vue'
+import PreAffiliationSubmittedView from '~/components/affiliacion/PreAffiliationSubmittedView.vue'
+
+const menuOpen = ref(false)
+const recordingStartedAt = ref<number | null>(null)
+const recordedDurationSec = ref<number>(0)
+let recordingTimer: number | null = null
+
+const menuItems: AppMenuItem[] = [
+  { key: 'home', label: 'Inicio', icon: 'home' },
+  { key: 'pre', label: 'Ingresar Preafiliación', icon: 'user-plus-solid' },
+  { key: 'history', label: 'Historial', icon: 'file-lines-solid' },
+]
+
+const preEventId = ref('')
+const preBranchCode = ref('')
 
 const router = useRouter()
 const { override, setAuto } = useConnectivityMode()
@@ -153,39 +146,68 @@ const online = computed(() => {
   return status.value.online
 })
 
-// const isRutReady = computed(() => isValidRut(rut.value))
+const consultResult = ref<{
+  rut: string
+  prospectName: string
+  benefitStartDate: string
+  compensationBox: string
+  status: 'not-affiliated' | 'affiliated'
+}>({
+  rut: '',
+  prospectName: '',
+  benefitStartDate: '',
+  compensationBox: '',
+  status: 'not-affiliated'
+})
 
-const { 
-  videoInputs, 
-  selectedDeviceId, 
-  primePermissions, 
-  loadVideoDevices, 
-  handleSelectedDeviceChange 
+const {
+  videoInputs,
+  selectedDeviceId,
+  primePermissions,
+  loadVideoDevices,
+  handleSelectedDeviceChange
 } = useDevices()
-const { 
-  renderedTitle, 
-  paragraphs, 
-  vars, 
-  setVar, 
-  pendingx, 
-  error, 
+const {
+  renderedTitle,
+  paragraphs,
+  vars,
+  setVar,
+  pendingx,
+  error,
   source,
   refresh
 } = useTerms(online)
 
-type UiStep = 'rut' | 'terms'
-
+type UiStep = 'login' | 'welcome' | 'pre' | 'pre2' | 'pre3' | 'pre4' | 'pre5' | 'resultView' | 'rut' | 'terms'
+const uiStep = ref<UiStep>('login')
 /* ------------------------ Core state ------------------------ */
 const rut = ref('')
 const msg = ref('')
 const syncing = ref(false)
 
-const uiStep = ref<UiStep>('rut')
+const pass = ref('')
+const loginLoading = ref(false)
+const loginError = ref('')
+
 const termsAccepted = ref(false)
 const isRutReady = computed(() => isValidRut(rut.value))
 
 const editingId = ref<string | null>(null)
 const editingOriginal = ref<any | null>(null)
+
+
+const submittedResult = ref({
+  eventId: '',
+  statusText: 'Ingresada',
+  submittedAt: '',
+  clientRut: '',
+  clientName: '',
+  compensationBox: '',
+  executiveName: 'Constanza Vera Veas',
+  executiveRut: '11.111.111-1',
+  executiveEmail: 'c.vera@losheroes.cl',
+  branchCode: '00002'
+})
 
 function setMsg(t: string) {
   msg.value = t
@@ -256,13 +278,50 @@ const { cameraOn, recording, startCamera, stopCamera, startRecording, stopRecord
 
 const isMobile = computed(() => import.meta.client && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
 
-/* ------------------------ Floating video ------------------------ */
-const floatEnabled = computed(() => termsAccepted.value && cameraOn.value)
-const { videoFloatEl, videoFloatStyle, onDragPointerDown, onResizePointerDown } = useFloatingVideo({
-  enabled: floatEnabled
-})
 
 /* ------------------------ UI helpers ------------------------ */
+
+function startRecordingClock() {
+  recordingStartedAt.value = Date.now()
+  recordedDurationSec.value = 0
+
+  if (recordingTimer) {
+    window.clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+
+  recordingTimer = window.setInterval(() => {
+    if (!recordingStartedAt.value) return
+    recordedDurationSec.value = Math.floor((Date.now() - recordingStartedAt.value) / 1000)
+  }, 1000)
+}
+
+function stopRecordingClock() {
+  if (recordingTimer) {
+    window.clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+
+  if (recordingStartedAt.value) {
+    recordedDurationSec.value = Math.floor((Date.now() - recordingStartedAt.value) / 1000)
+  }
+
+  recordingStartedAt.value = null
+}
+
+function resetRecordingClock() {
+  if (recordingTimer) {
+    window.clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+
+  recordingStartedAt.value = null
+  recordedDurationSec.value = 0
+}
+
+
+
+
 const showVarsForm = ref(false)
 
 function extFromMime(mime: string) {
@@ -287,8 +346,58 @@ function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => {
     try {
       URL.revokeObjectURL(url)
-    } catch {}
+    } catch { }
   }, 1500)
+}
+
+
+function onConsultAffiliation(payload: { rut: string }) {
+  consultResult.value = {
+    rut: payload.rut,
+    prospectName: 'Maria Antonia Galvez Lopez',
+    benefitStartDate: 'Sin afiliación',
+    compensationBox: 'Sin afiliación',
+    status: 'not-affiliated'
+  }
+
+  uiStep.value = 'resultView'
+}
+
+function goFromResultToPre3() {
+  uiStep.value = 'pre3'
+}
+
+function goBackStep() {
+  uiStep.value = 'pre2'
+}
+
+function goBackFromPre3() {
+  uiStep.value = 'resultView'
+}
+
+function cancelPreAffiliation() {
+  preEventId.value = ''
+  preBranchCode.value = ''
+
+  consultResult.value = {
+    rut: '',
+    prospectName: '',
+    benefitStartDate: '',
+    compensationBox: '',
+    status: 'not-affiliated'
+  }
+
+  uiStep.value = 'welcome'
+}
+
+function onStartBiometric() {
+  uiStep.value = 'pre4'
+}
+
+function goFromPre4ToNext() {
+  rut.value = consultResult.value.rut || ''
+  termsAccepted.value = true
+  uiStep.value = 'terms'
 }
 
 function downloadPending(item: any) {
@@ -305,22 +414,36 @@ function downloadPending(item: any) {
 }
 
 /* ------------------------ Flow / navigation ------------------------ */
+
+function onPreContinue(payload: { eventId: string; branchCode: string }) {
+  preEventId.value = payload.eventId
+  preBranchCode.value = payload.branchCode
+  uiStep.value = 'pre2'
+}
+
 function goToTerms() {
   if (!isRutReady.value) return setMsg('Ingresa un RUT válido (con dígito verificador).')
+  termsAccepted.value = true
   uiStep.value = 'terms'
 }
 
 function back() {
   cleanupPreview()
   stopCamera()
+  resetRecordingClock()
   resetFlow()
 }
 
 function resetFlow() {
   termsAccepted.value = false
-  uiStep.value = 'rut'
   rut.value = ''
+  resetRecordingClock()
   scrollToTopAnchor()
+}
+
+function onStopCameraWithReset() {
+  stopCamera()
+  resetRecordingClock()
 }
 
 function resetToStartAfterDelay(ms = 3000) {
@@ -372,6 +495,45 @@ function badgeStyle(s: any) {
   return base + ' background:#f5f5f5; color:#333; border:1px solid #ddd;'
 }
 
+function onMenuSelect(key: string) {
+  console.log("🚀 ~ onMenuSelect ~ key:", key)
+  if (key === 'home') uiStep.value = 'welcome'
+  if (key === 'pre') uiStep.value = 'pre'
+  if (key === 'history') {
+    console.log('xxxxx')
+  }
+}
+
+function onMenuLogout() {
+  uiStep.value = 'login'
+}
+
+async function onStartRecording() {
+  startRecordingClock()
+  await startRecording()
+}
+
+function onStopRecording() {
+  stopRecording()
+  stopRecordingClock()
+}
+//LOGIN
+async function onLoginSubmit() {
+  loginLoading.value = true
+  try {
+    await new Promise(r => setTimeout(r, 600))
+    uiStep.value = 'welcome'
+  } catch (err) {
+    loginError.value = 'Error de autenticación'
+  } finally {
+    loginLoading.value = false
+  }
+}
+
+function onForgot() {
+  alert('Recuperación de contraseña próximamente')
+}
+
 /* ------------------------ Pending actions ------------------------ */
 async function confirmPending(item: any) {
   const updated = await confirmToReady(item)
@@ -396,7 +558,10 @@ function openFilePicker() {
 function openCameraPicker() {
   if (!rut.value) return setMsg('Debes ingresar el RUT antes de grabar un video.')
   const el = cameraInputEl.value
-  if (!el) return
+  if (!el) {
+    setMsg('No se encontró el input de cámara.')
+    return
+  }
   el.value = ''
   el.click()
 }
@@ -424,7 +589,8 @@ async function editPendingVideo(item: any) {
   if (!item?.id) return
 
   if (item.status === 'ready') {
-    const updated = toPlainCase(item, { status: 'review', confirmedAt: null })
+    const updated:any  = toPlainCase(item, { status: 'review', confirmedAt: null })
+    
     await idbPut(updated)
     await refreshPending()
   }
@@ -437,7 +603,6 @@ async function editPendingVideo(item: any) {
   setMsg(`Editando video del caso: ${item.id}`)
 }
 
-/* ------------------------ Upload (queda en app) ------------------------ */
 async function uploadCase(item: any) {
   const blob = new Blob(item.chunks, { type: item.mimeType })
 
@@ -455,13 +620,30 @@ async function uploadCase(item: any) {
 
   fd.append('video', blob, `${item.rut}-${item.createdAt}.${ext}`)
 
-  const res = await fetch('https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/upload', { method: 'POST', body: fd })
-  console.log("🚀 ~ uploadCase ~ res:", res)
-  
+  const res = await fetch('https://v9k9214s-3001.brs.devtunnels.ms/tracking/sitpriv/upload', {
+    method: 'POST',
+    body: fd
+  })
+
   if (!res.ok) {
     const txt = await res.text().catch(() => '')
     throw new Error(`Upload falló: ${res.status} ${txt}`)
   }
+
+  submittedResult.value = {
+    eventId: preEventId.value || '000987654334',
+    statusText: 'Ingresada',
+    submittedAt: new Date().toLocaleDateString('es-CL'),
+    clientRut: item.rut || rut.value,
+    clientName: consultResult.value.prospectName || 'Sin nombre',
+    compensationBox: consultResult.value.compensationBox || 'No afiliado',
+    executiveName: 'Constanza Vera Veas',
+    executiveRut: '11.111.111-1',
+    executiveEmail: 'c.vera@losheroes.cl',
+    branchCode: preBranchCode.value || '00002'
+  }
+
+  uiStep.value = 'pre5'
 }
 
 /* ------------------------ Sync composable ------------------------ */
@@ -504,40 +686,102 @@ function goHome() {
 
 function resetVars() {
   Object.keys(vars.value).forEach((k) => {
-    ;(vars.value as any)[k] = ''
+    ; (vars.value as any)[k] = ''
   })
   if (import.meta.client) {
     try {
       localStorage.removeItem('afiliacion:guionVars:v1')
-    } catch {}
+    } catch { }
   }
+}
+
+function goToHomeFromSubmitted() {
+  cleanupPreview()
+  stopCamera()
+  uiStep.value = 'pre'
 }
 
 /* ------------------------ Enciende camara ------------------------ */
 
 async function startCameraWithGuion() {
+  console.log('startCameraWithGuion ejecutado', {
+    rut: rut.value,
+    isRutReady: isRutReady.value,
+    uiStep: uiStep.value
+  })
+
   try {
     await refresh()
+    console.log('[terms.refresh] ok')
   } catch (e) {
     console.warn('[terms.refresh] falló:', e)
   }
 
-  await startCamera()
+  try {
+    console.log('[camera] primePermissions:start')
+    await primePermissions()
+    console.log('[camera] primePermissions:ok')
+  } catch (e) {
+    console.error('[camera] primePermissions:error', e)
+    setMsg('No se pudieron solicitar permisos de cámara.')
+    return
+  }
+
+  try {
+    console.log('[camera] loadVideoDevices:start')
+    await loadVideoDevices()
+    console.log('[camera] loadVideoDevices:ok', {
+      selectedDeviceId: selectedDeviceId.value,
+      devices: videoInputs.value?.map(d => ({
+        id: d.deviceId,
+        label: d.label
+      }))
+    })
+  } catch (e) {
+    console.error('[camera] loadVideoDevices:error', e)
+    setMsg('No se pudieron cargar las cámaras disponibles.')
+    return
+  }
+
+  try {
+    console.log('[camera] startCamera:start', {
+      videoElExists: !!videoEl.value,
+      selectedDeviceId: selectedDeviceId.value
+    })
+
+    await startCamera()
+
+    console.log('[camera] startCamera:ok', {
+      cameraOn: cameraOn.value,
+      videoElExists: !!videoEl.value,
+      videoSrcObject: !!videoEl.value?.srcObject
+    })
+  } catch (e) {
+    console.error('[camera] startCamera:error', e)
+    setMsg('No se pudo iniciar la cámara. Revisa permisos del navegador.')
+  }
 }
 
 /* ------------------------ Watches ------------------------ */
 watch(
-  () => termsAccepted.value,
-  async (accepted) => {
-    if (!accepted) return
-    if (!isRutReady.value) {
-      termsAccepted.value = false
-      return setMsg('Ingresa un RUT válido (con dígito verificador) para continuar.')
-    }
-    setMsg('Términos aceptados. Puedes encender cámara o adjuntar un video.')
-    await primePermissions()
-    await loadVideoDevices()
+  () => uiStep.value,
+  async (step) => {
+    if (step !== 'terms') return
 
+    if (!isRutReady.value) {
+      setMsg('Ingresa un RUT válido (con dígito verificador) para continuar.')
+      return
+    }
+
+    termsAccepted.value = true
+
+    try {
+      await primePermissions()
+      await loadVideoDevices()
+      console.log('[terms] permisos y dispositivos listos')
+    } catch (e) {
+      console.warn('[terms] no se pudieron preparar permisos/dispositivos', e)
+    }
   }
 )
 
@@ -598,154 +842,39 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page {
-  max-width: 920px;
-  margin: 24px auto;
+  height: 100dvh;
+  overflow: hidden;
   font-family: system-ui;
-  padding: 0 16px;
+  background: #F0F3F7;
+  display: flex;
+  flex-direction: column;
 }
 
 .card {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: 1fr;
+  flex: 1;
+  min-height: 0;
   position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .top-anchor {
-  position: relative;
-  top: -8px;
-}
-
-.status {
-  margin: 0;
-  font-size: 10px;
-}
-
-/* ✅ Estas clases ahora viven dentro de componentes, por eso :deep */
-:deep(.stack) {
-  display: grid;
-  gap: 12px;
-}
-
-:deep(.field) {
-  display: grid;
-  gap: 6px;
-}
-
-:deep(.label) {
-  font-size: 12px;
-  opacity: 0.9;
-}
-
-:deep(.input) {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  box-sizing: border-box;
-}
-
-:deep(.hint) {
-  opacity: 0.7;
-}
-
-:deep(.actions) {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-:deep(.meta) {
-  margin: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
 }
 
 .hidden {
   display: none;
 }
 
-:deep(.terms) {
-  padding: 12px 14px;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  background: #fff;
+:deep(.stack) {
   display: grid;
-  gap: 10px;
-}
-
-:deep(.terms__title) {
-  margin: 0;
-}
-
-:deep(.terms__p) {
-  margin: 0;
-  line-height: 1.4;
-}
-
-:deep(.checkbox) {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-:deep(.preview) {
-  margin-top: 12px;
-}
-
-:deep(.preview__video) {
-  width: 100%;
-  border-radius: 12px;
-}
-
-:deep(.pending) {
-  margin-top: 14px;
-}
-
-:deep(.pending__head) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-:deep(.pending__list) {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-:deep(.pending__item) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  background: #fff;
-}
-
-:deep(.pending__info) {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-:deep(.pending__rut) {
-  font-weight: 700;
-}
-
-:deep(.pending__sub) {
-  font-size: 12px;
-  opacity: 0.75;
-}
-
-:deep(.pending__actions) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 :deep(.empty),
@@ -756,178 +885,69 @@ onBeforeUnmount(() => {
   background: #f5f5f5;
 }
 
-/* ✅ botones dentro de componentes */
-:deep(button.btn),
-:deep(button) {
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  background: white;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-:deep(button:disabled) {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-:deep(.btn-ghost2) {
-  justify-self: start;
-}
-
-/* Floating video */
-.draggable-resizable {
-  position: fixed;
-  z-index: 9999;
-  border-radius: 14px;
-  overflow: hidden;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
-  touch-action: none;
-}
-
-.video-float__video {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* Drag icon */
-.video-float__drag {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  cursor: grab;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.video-float__drag:active {
-  cursor: grabbing;
-}
-
-.video-float__drag::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.75) 2px, transparent 3px) 0 0 / 8px 8px;
-  opacity: 0.95;
-}
-
-.video-float__resize {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  cursor: nwse-resize;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.video-float__resize::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-right: 2px solid rgba(255, 255, 255, 0.65);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.65);
-  border-radius: 4px;
-}
-
-/* Bottom controls */
-.bottom-controls {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding: 18px 20px 28px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 28px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
-  backdrop-filter: blur(6px);
-  z-index: 9998;
-}
-
-.btn-record {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  border: 6px solid white;
-  background: red;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.btn-record:hover {
-  transform: scale(1.05);
-}
-
-.btn-stop {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  border: 6px solid white;
-  background: #b00020;
-  color: white;
-  font-size: 22px;
-  cursor: pointer;
-}
-
-.btn-ghost {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.btn-home {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-
-  width: 25px;
-  height: 25px;
-
-  border-radius: 50%;
-  border: 0px solid #ccc;
+.appBottom {
+  flex: 0 0 72px;
+  height: 72px;
   background: #fff;
+  box-shadow: 4px 0px 6px -2px rgba(12, 12, 13, 0.1),
+              2px 0px 4px -2px rgba(12, 12, 13, 0.05);
+  z-index: 20;
+}
 
-  display: grid;
+.appBottom__inner {
+  height: 72px;
+  padding: 0 16px;
+  display: flex;
+}
+
+.appBottom__tab {
+  flex: 1;
+  height: 72px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  place-items: center;
-  font-size: 15px;
-  cursor: pointer;
+  gap: 2px;
   padding: 0;
-  line-height: 1;
+  color: #00275E;
 }
 
-.btn-home:active {
-  transform: scale(0.98);
+.appBottom__pill {
+  height: 28px;
+  width: 140px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FCEEE3;
 }
 
-:deep(.vars-panel) {
-  margin-top: 10px;
-  padding: 14px;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  background: #fafafa;
-  display: grid;
-  gap: 10px;
+.appBottom__pill--plain {
+  background: #fff;
+}
+
+.appBottom__text {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #00275E;
+}
+
+.appBottom__text--blue {
+  color: #00275E;
+}
+
+.appBottom__tab--active {
+  color: #EE7623;
+}
+
+.appBottom__tab--active .appBottom__text {
+  color: #EE7623;
+}
+
+.appBottom__tab--active .appBottom__pill {
+  background: #FCEEE3;
 }
 </style>

@@ -1,72 +1,21 @@
-<template>
-  <div class="stack">
-    <label class="field">
-      <span class="label">Cámara</span>
-      <select
-        :value="selectedDeviceId"
-        @change="onDeviceChange"
-        :disabled="!videoInputs.length || recording"
-        class="input"
-      >
-        <option value="">(Automática)</option>
-        <option v-for="d in videoInputs" :key="d.deviceId" :value="d.deviceId">
-          {{ d.label || `Cámara ${d.deviceId.slice(0, 6)}…` }}
-        </option>
-      </select>
-    </label>
-
-    <div class="actions">
-      <button class="btn" @click="$emit('startCamera')" :disabled="cameraOn">🎥 Encender cámara</button>
-      <button class="btn" @click="$emit('stopCamera')" :disabled="!cameraOn">⛔ Apagar cámara</button>
-
-      <!-- Adjuntar: el input que entra por slot debe NO tener capture -->
-      <button class="btn" @click="$emit('openFilePicker')" :disabled="syncing">📎 Adjuntar video</button>
-      <slot name="fileInput" />
-
-      <!-- Grabar: SOLO si showRecordPicker -->
-      <template v-if="showRecordPicker">
-        <button class="btn" @click="$emit('openCameraPicker')" :disabled="syncing">🎥 Grabar video</button>
-        <slot name="cameraInput" />
-      </template>
-
-      <button class="btn" @click="$emit('syncPending')" :disabled="syncing || !online">🔄 Enviar confirmados</button>
-    </div>
-
-    <p class="meta">
-      Pendientes: <b>{{ pendingCount }}</b>
-      — Confirmados vencidos (auto): <b>{{ readyExpiredCount }}</b>
-    </p>
-
-    <div v-if="lastPreviewUrl" class="preview">
-      <h3 class="subtitle">Última grabación (preview)</h3>
-      <video :src="lastPreviewUrl" controls class="preview__video"></video>
-    </div>
-
-    <slot />
-  </div>
-</template>
-
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    selectedDeviceId: string
-    videoInputs: MediaDeviceInfo[]
-    recording: boolean
-    cameraOn: boolean
-    syncing: boolean
-    online: boolean
-    pendingCount: number
-    readyExpiredCount: number
-    lastPreviewUrl: string
-    showRecordPicker?: boolean
-  }>(),
-  {
-    showRecordPicker: false
-  }
-)
+import { computed } from 'vue'
+
+const props = defineProps<{
+  selectedDeviceId: string
+  videoInputs: Array<{ deviceId: string; label?: string }>
+  recording: boolean
+  cameraOn: boolean
+  syncing: boolean
+  online: boolean
+  pendingCount: number
+  readyExpiredCount: number
+  lastPreviewUrl?: string
+  showRecordPicker?: boolean
+}>()
 
 const emit = defineEmits<{
-  (e: 'update:selectedDeviceId', v: string): void
+  (e: 'update:selectedDeviceId', value: string): void
   (e: 'startCamera'): void
   (e: 'stopCamera'): void
   (e: 'openFilePicker'): void
@@ -74,7 +23,122 @@ const emit = defineEmits<{
   (e: 'syncPending'): void
 }>()
 
-function onDeviceChange(e: Event) {
-  emit('update:selectedDeviceId', (e.target as HTMLSelectElement).value)
-}
+const hasPreview = computed(() => !!props.lastPreviewUrl)
+const canSync = computed(() => props.online && !props.syncing && props.pendingCount > 0)
 </script>
+
+<template>
+  <section class="lh-captureScreen">
+    <div class="lh-captureScreen__top">
+      <div class="lh-captureScreen__status">
+        <span class="lh-chip" :class="online ? 'lh-chip--success' : 'lh-chip--muted'">
+          {{ online ? 'ONLINE' : 'OFFLINE' }}
+        </span>
+
+        <span v-if="pendingCount > 0" class="lh-chip lh-chip--soft">
+          Pendientes: {{ pendingCount }}
+        </span>
+
+        <span v-if="readyExpiredCount > 0" class="lh-chip lh-chip--warning">
+          Vencidos: {{ readyExpiredCount }}
+        </span>
+      </div>
+
+      <div v-if="videoInputs?.length" class="lh-deviceSelect">
+        <label class="lh-deviceSelect__label">Cámara</label>
+        <select
+          class="lh-deviceSelect__select"
+          :value="selectedDeviceId"
+          @change="emit('update:selectedDeviceId', ($event.target as HTMLSelectElement).value)"
+        >
+          <option
+            v-for="device in videoInputs"
+            :key="device.deviceId"
+            :value="device.deviceId"
+          >
+            {{ device.label || 'Cámara disponible' }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="lh-captureLayout">
+      <!-- Preview -->
+      <div class="lh-previewCard">
+        <template v-if="hasPreview">
+          <video
+            :src="lastPreviewUrl"
+            class="lh-previewCard__video"
+            controls
+            playsinline
+          />
+        </template>
+
+        <template v-else>
+          <div class="lh-previewCard__empty">
+            <div class="lh-previewCard__icon">📷</div>
+            <div class="lh-previewCard__title">Vista previa de la cámara</div>
+            <div class="lh-previewCard__text">
+              Selecciona “Iniciar Grabación” para comenzar
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Actions -->
+      <div class="lh-captureActions">
+        <div class="lh-captureActions__row">
+          <button
+            class="lh-roundAction"
+            type="button"
+            @click="emit(showRecordPicker ? 'openCameraPicker' : 'startCamera')"
+          >
+            ▶
+          </button>
+
+          <button
+            class="lh-roundAction lh-roundAction--outline"
+            type="button"
+            @click="emit('stopCamera')"
+            :disabled="!cameraOn"
+          >
+            ↺
+          </button>
+        </div>
+
+        <button
+          class="lh-btnPrimary lh-btnPrimary--capture"
+          type="button"
+          @click="emit(showRecordPicker ? 'openCameraPicker' : 'startCamera')"
+          :disabled="syncing"
+        >
+          Ingresar
+        </button>
+
+        <button
+          class="lh-btnOutline"
+          type="button"
+          @click="emit('openFilePicker')"
+          :disabled="syncing"
+        >
+          Adjuntar video
+        </button>
+
+        <button
+          class="lh-btnSecondaryAlt"
+          type="button"
+          @click="emit('syncPending')"
+          :disabled="!canSync"
+        >
+          {{ syncing ? 'Sincronizando...' : 'Enviar pendientes' }}
+        </button>
+      </div>
+    </div>
+
+    <div class="lh-captureScreen__slot">
+      <slot name="fileInput" />
+      <slot name="cameraInput" />
+      <slot />
+    </div>
+  </section>
+</template>

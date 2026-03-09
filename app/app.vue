@@ -4,9 +4,7 @@
     <UApp>
       <NuxtPage />
     </UApp>
-
     <template #fallback>
-      <div></div>
     </template>
   </ClientOnly>
 </template>

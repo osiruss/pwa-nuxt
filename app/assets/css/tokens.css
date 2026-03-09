@@ -1,0 +1,379 @@
+/* =========================
+   LosHéroes UI – tokens + utilidades
+   ========================= */
+
+/* ---- Tokens (Design system) ---- */
+:root{
+  /* Brand */
+   --bg-fill-primary: #FF4C00;
+  --brand-primary: #FF4C00;
+
+  --text-title: #1F1C1C;
+  --text-muted: #787472;
+
+  --border: #BDB9B7;
+
+  --surface: #FFFFFF;
+
+
+  --radius-pill: 99999px;
+
+  --font-figtree: "Figtree", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --font-sora: "Sora", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  
+  --lh-bg: #F0F3F7;
+  --lh-surface: #FFFFFF;
+
+  --lh-primary: #00275E;   /* azul textos */
+  --lh-accent: #EE7623;    /* naranja */
+  --lh-accent-soft: #FCEEE3;
+
+  --lh-blue-strong: #003D92;
+
+  --lh-text: #0C0C0D;
+  --lh-muted: #606366;
+  --lh-muted-2: #727578;
+
+  --lh-border: #E5E7EB;
+  --lh-disabled-300: #D1D5DB;
+
+  --lh-field-bg: #FAFBFC;
+  --lh-info-bg: rgba(227, 238, 252, 0.5);
+
+  --lh-radius-sm: 8px;
+  --lh-radius-md: 12px;
+  --lh-radius-pill: 999px;
+
+  --lh-shadow-1: 0px 1px 4px rgba(12, 12, 13, 0.05);
+  --lh-shadow-2: 0px 4px 6px -2px rgba(12, 12, 13, 0.1), 0px 2px 4px -2px rgba(12, 12, 13, 0.05);
+
+  /* Layout */
+  --lh-page-w: 375px;
+  --lh-card-w: 343px;
+  --lh-pad-x: 16px;
+
+  /* Bottom bar */
+  --lh-bottom-h: 72px;
+
+  /* Typography */
+  --lh-font: 'Roboto', system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+}
+
+/* ---- Reset base mínimo ---- */
+.lh{
+  font-family: var(--lh-font);
+  color: var(--lh-primary);
+}
+
+/* =========================
+   Layout
+   ========================= */
+
+.lh-page{
+  min-height: 100vh;
+  background: var(--lh-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.lh-container{
+  width: 100%;
+}
+
+.lh-card{
+  width: var(--lh-card-w);
+  max-width: calc(100% - (var(--lh-pad-x) * 2));
+  margin: 24px auto 0;
+  background: var(--lh-surface);
+  border-radius: var(--lh-radius-sm);
+  box-shadow: var(--lh-shadow-1);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.lh-stack{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Spacer para que no tape el bottom bar global */
+.lh-bottomSpacer{
+  height: calc(var(--lh-bottom-h) + 20px + env(safe-area-inset-bottom));
+}
+
+/* =========================
+   Header / Topbar
+   ========================= */
+
+.lh-topbar{
+  width: 100%;
+  background: var(--lh-surface);
+  box-shadow: var(--lh-shadow-2);
+}
+
+.lh-topbar__inner{
+  width: 100%;
+  height: 65px;
+  padding: 4px var(--lh-pad-x);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.lh-topbar__title{
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 600;
+  color: var(--lh-primary);
+}
+
+/* Header grande (para PreAfiliación) */
+.lh-heroHead{
+  width: 100%;
+  background: var(--lh-surface);
+  box-shadow: var(--lh-shadow-2);
+  padding: 20px var(--lh-pad-x) 14px;
+  box-sizing: border-box;
+}
+
+.lh-heroHead__title{
+  margin: 0;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 34px;
+  color: var(--lh-primary);
+}
+
+/* =========================
+   Textos / labels
+   ========================= */
+
+.lh-h2{
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  color: #000;
+}
+
+.lh-label{
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: #000;
+}
+
+.lh-value{
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--lh-muted);
+}
+
+/* Texto de ayuda dentro card (Pre) */
+.lh-lead{
+  margin: 0;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 28px;
+  color: #000;
+}
+
+.lh-caption{
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 20px;
+  color: #666260;
+}
+
+/* =========================
+   Info box (welcome)
+   ========================= */
+.lh-infoBox{
+  background: var(--lh-info-bg);
+  border: 1px solid var(--lh-bg);
+  border-radius: var(--lh-radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* =========================
+   Inputs (Figma: field con border bottom azul)
+   ========================= */
+
+.lh-fieldGroup{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lh-fieldLabel{
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 22px;
+  color: var(--lh-primary);
+}
+
+.lh-field{
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 16px 14px;
+  height: 56px;
+  background: var(--lh-field-bg);
+  border-bottom: 2px solid var(--lh-blue-strong);
+  border-radius: 8px 8px 0 0;
+}
+
+.lh-input{
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 28px;
+  color: var(--lh-text);
+}
+
+.lh-input::placeholder{
+  color: var(--lh-muted-2);
+}
+
+/* =========================
+   Buttons
+   ========================= */
+
+.lh-btnPrimary{
+  width: 100%;
+  height: 48px; /* default */
+  border-radius: var(--lh-radius-sm);
+  border: 0;
+  background: var(--lh-accent);
+  color: #FCFBFA;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.lh-btnPrimary:disabled{
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+/* Variante grande (PreAfiliación) */
+.lh-btnPrimary--lg{
+  height: 72px;
+  border-radius: 12px;
+  font-size: 24px;
+  line-height: 28px;
+}
+
+/* Botón link (Cancelar) */
+.lh-btnLink{
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 14px 0;
+  color: var(--lh-primary);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 30px;
+}
+
+/* =========================
+   Step bar
+   ========================= */
+
+.lh-stepbar{
+  height: 36px;
+  background: var(--lh-surface);
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.lh-step{
+  height: 4px;
+  flex: 1;
+  background: var(--lh-disabled-300);
+  border-radius: 9px;
+}
+
+.lh-step--on{
+  background: var(--lh-accent);
+}
+
+/* =========================
+   Bottom bar (si la necesitas en otras vistas)
+   ========================= */
+
+.lh-bottomBar{
+  margin-top: auto;
+  height: var(--lh-bottom-h);
+  background: var(--lh-surface);
+  box-shadow: 4px 0px 6px -2px rgba(12, 12, 13, 0.1), 2px 0px 4px -2px rgba(12, 12, 13, 0.05);
+}
+
+.lh-bottomBar__inner{
+  width: 100%;
+  height: var(--lh-bottom-h);
+  padding: 0 var(--lh-pad-x);
+  display:flex;
+  gap: 0;
+  box-sizing: border-box;
+}
+
+.lh-tab{
+  flex: 1;
+  height: var(--lh-bottom-h);
+  border: 0;
+  background: transparent;
+  display:flex;
+  flex-direction: column;
+  align-items:center;
+  justify-content:center;
+  gap: 2px;
+  padding: 0;
+  color: var(--lh-primary);
+}
+
+.lh-tab__pill{
+  height: 28px;
+  width: 140px;
+  border-radius: var(--lh-radius-pill);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 10px;
+  background: var(--lh-accent-soft);
+}
+
+.lh-tab__pill--plain{
+  background: var(--lh-surface);
+}
+
+.lh-tab__text{
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--lh-primary);
+}
+
+.lh-tab--active{
+  color: var(--lh-accent);
+}
+
+.lh-tab--active .lh-tab__text{
+  color: var(--lh-accent);
+}

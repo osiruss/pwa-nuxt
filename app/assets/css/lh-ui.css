@@ -1,0 +1,197 @@
+:root{
+  --lh-bg: #F0F3F7;
+  --lh-white: #FFFFFF;
+
+  --lh-primary: #00275E;     /* textos azules */
+  --lh-blueLine: #003D92;    /* underline input */
+  --lh-accent: #EE7623;      /* naranja botones / step activo */
+
+  --lh-muted: #606366;
+  --lh-placeholder: #727578;
+  --lh-caption: #666260;
+
+  --lh-disabled: #D1D5DB;
+
+  --lh-cardW: 343px;
+
+  --lh-shadow-1: 0px 1px 4px rgba(12, 12, 13, 0.05);
+  --lh-shadow-2: 0px 4px 6px -2px rgba(12, 12, 13, 0.10), 0px 2px 4px -2px rgba(12, 12, 13, 0.05);
+}
+
+/* ---------------- Page base ---------------- */
+.lh-page{
+  min-height: 100vh;
+  background: var(--lh-bg);
+  display:flex;
+  flex-direction: column;
+}
+
+/* ---------------- Top bar (título grande) ---------------- */
+.lh-topbar{
+  background: var(--lh-white);
+  box-shadow: var(--lh-shadow-2);
+}
+
+.lh-topbar__inner{
+  padding: 24px 16px 18px; /* para que se parezca al “bloque” del figma */
+}
+
+.lh-title{
+  margin: 0;
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 34px;   /* se ve como tu screenshot */
+  line-height: 40px;
+  color: var(--lh-primary);
+}
+
+/* ---------------- Step bar ---------------- */
+.lh-steps{
+  background: var(--lh-white);
+  padding: 16px;
+  display:flex;
+  gap: 16px;
+}
+
+.lh-step{
+  flex: 1;
+  height: 4px;
+  border-radius: 9px;
+  background: var(--lh-disabled);
+}
+
+.lh-step--active{
+  background: var(--lh-accent);
+}
+
+/* ---------------- Content spacing ---------------- */
+.lh-content{
+  padding: 24px 16px 24px;
+}
+
+/* ---------------- Card ---------------- */
+.lh-card{
+  width: var(--lh-cardW);
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--lh-white);
+  border-radius: 8px;
+  box-shadow: var(--lh-shadow-1);
+  padding: 16px;
+}
+
+.lh-card__stack{
+  display:flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lh-card__headline{
+  margin: 0;
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 24px;   /* calza con la vista */
+  line-height: 32px;
+  color: #000000;
+}
+
+/* ---------------- Input blocks ---------------- */
+.lh-field{
+  display:flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lh-label{
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--lh-primary);
+}
+
+.lh-input{
+  width: 100%;
+  height: 56px;
+  padding: 16px 14px;
+  background: #FAFBFC;
+  border: 0;
+  border-bottom: 1px solid var(--lh-blueLine);
+  border-radius: 8px 8px 0 0;
+  outline: none;
+
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 400;
+  font-size: 24px;      /* el placeholder grande en tu screenshot */
+  line-height: 24px;
+  color: #111827;
+  caret-color: var(--lh-blueLine);
+  box-sizing: border-box;
+}
+
+.lh-input::placeholder{
+  color: var(--lh-placeholder);
+  opacity: 1;
+}
+
+.lh-caption{
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--lh-caption);
+}
+
+/* ---------------- Primary button ---------------- */
+.lh-btnPrimary{
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--lh-accent);
+  color: #FCFBFA;
+
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 20px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.lh-btnPrimary:disabled{
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* ---------------- Cancel link (como Figma: texto centrado, sin caja) ---------------- */
+.lh-cancel{
+  width: var(--lh-cardW);
+  max-width: 100%;
+  margin: 22px auto 0;
+  height: 48px;
+
+  background: transparent;
+  border: 0;
+  padding: 0;
+
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 28px;       /* se ve grande como en tu screenshot */
+  line-height: 32px;
+  text-align: center;
+  color: var(--lh-primary);
+
+  cursor: pointer;
+}
+
+/* (opcional) foco accesible */
+.lh-btnPrimary:focus-visible,
+.lh-input:focus-visible,
+.lh-cancel:focus-visible{
+  outline: 2px solid rgba(0, 61, 146, .25);
+  outline-offset: 2px;
+}
